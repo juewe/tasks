@@ -145,13 +145,13 @@ class TaskViewHolder internal constructor(
         setupChips(filter, sortMode == SORT_START)
 
         if ((context as MainActivity).isCompletedHeader){
-            val completedDate =  if (task.getTask().completionDate > 0 )  " [" + DateUtilities.getLongDateStringWithTime(task.getTask().completionDate, Locale.getDefault())+"]" else ""
+            val completedDate =  if (task.getTask().completionDate > 0 )  " [" + DateUtilities.getLongDateStringWithTime(task.getTask().completionDate, Locale.GERMAN)+"]" else ""
             val info = if(task.parentTitle == null) "" else task.parentTitle
             if (task.parentTitle==null){
                 nameView.append(completedDate);
             } else{
                 markdown.setMarkdown(description, info + " " + completedDate);
-                description.visibility = View.VISIBLE
+                description.visibility = if ((context as MainActivity).isCompletedHeader) View.VISIBLE else View.GONE;
             }
         } else
         if (preferences.getBoolean(R.string.p_show_description, true)) {
