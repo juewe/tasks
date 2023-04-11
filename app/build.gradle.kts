@@ -162,6 +162,7 @@ val genericImplementation by configurations
 val googleplayImplementation by configurations
 
 dependencies {
+    implementation("androidx.core:core-ktx:+")
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.bitfire.dav4jvm) {
         exclude(group = "junit")

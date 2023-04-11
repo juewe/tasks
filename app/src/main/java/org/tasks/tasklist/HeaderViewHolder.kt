@@ -5,6 +5,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.todoroo.astrid.activity.MainActivity
 import com.todoroo.astrid.api.Filter
 import org.tasks.R
 
@@ -28,11 +29,13 @@ class HeaderViewHolder(
             null
         }
 
+        (context as MainActivity).isCompletedHeader = false
         if (header == null) {
             row.visibility = View.GONE
         } else {
             row.visibility = View.VISIBLE
             this.title.text = header
+            if (header==context.getString(R.string.completed)||header=="Completed") (context as MainActivity).isCompletedHeader = true else (context as MainActivity).isCompletedHeader = false
             this.title.setTextColor(section.headerColor(context, groupMode))
             rotation = if (section.collapsed) -180f else 0f
             chevron.rotation = rotation

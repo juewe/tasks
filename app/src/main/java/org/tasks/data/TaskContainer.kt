@@ -13,6 +13,7 @@ data class TaskContainer(
     val accountType: Int = CaldavAccount.TYPE_LOCAL,
     val parentComplete: Boolean = false,
     @ColumnInfo(name = "tags") val tagsString: String? = null,
+    @ColumnInfo(name = "parentTitle") val parentTitle: String? = null,
     val children: Int = 0,
     val sortGroup: Long? = null,
     val primarySort: Long = 0,

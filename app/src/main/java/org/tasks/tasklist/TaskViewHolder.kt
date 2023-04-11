@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.andlib.utility.DateUtilities.now
+import com.todoroo.astrid.activity.MainActivity
 import com.todoroo.astrid.api.CaldavFilter
 import com.todoroo.astrid.api.Filter
 import com.todoroo.astrid.api.GtasksFilter
@@ -155,6 +156,16 @@ class TaskViewHolder internal constructor(
             sortByStartDate = sortMode == SORT_START,
             sortByList = sortMode == SORT_LIST
         )
+       if ((context as MainActivity).isCompletedHeader){
+            val completedDate =  if (task.task.completionDate > 0 )  " [" + DateUtilities.getLongDateStringWithTime(task.task.completionDate, Locale.getDefault())+"]" else ""
+            val info = if(task.parentTitle == null) "" else task.parentTitle
+            if (task.parentTitle==null){
+                nameView.append(completedDate);
+            } else{
+                markdown.setMarkdown(description, info + " " + completedDate);
+                description.visibility = View.VISIBLE
+            }
+        } else
         if (preferences.getBoolean(R.string.p_show_description, true)) {
             markdown.setMarkdown(description, task.notes)
             description.visibility = if (task.hasNotes()) View.VISIBLE else View.GONE

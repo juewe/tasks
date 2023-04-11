@@ -27,9 +27,9 @@
     android:title="@string/debug_main_queries" />
 
   <SwitchPreferenceCompat
-    android:defaultValue="false"
-    android:key="@string/p_debug_pro"
-    android:title="@string/debug_pro"/>
+      android:defaultValue="true"
+      android:key="@string/p_debug_pro"
+      android:title="@string/debug_pro" />
 
   <Preference
     android:key="@string/debug_reset_ssl"

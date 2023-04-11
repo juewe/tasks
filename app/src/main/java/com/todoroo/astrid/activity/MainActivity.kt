@@ -105,6 +105,9 @@ class MainActivity : AppCompatActivity(), TaskListFragmentCallbackHandler {
     private var actionMode: ActionMode? = null
     private lateinit var binding: TaskListActivityBinding
 
+    public var isCompletedHeader = false;
+
+
     private val filter: Filter?
         get() = viewModel.state.value.filter
 

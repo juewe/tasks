@@ -669,12 +669,14 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
     }
 
     override fun onQueryTextSubmit(query: String): Boolean {
+        //if (callbacks is MainActivity) (callbacks as MainActivity).isCompletedHeader = false
         openFilter(requireContext().createSearchQuery(query.trim()))
         search.collapseActionView()
         return true
     }
 
     override fun onQueryTextChange(query: String): Boolean {
+        //if (callbacks is MainActivity) (callbacks as MainActivity).isCompletedHeader = true
         listViewModel.setSearchQuery(query)
         return true
     }
