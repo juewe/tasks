@@ -145,7 +145,7 @@ class TaskViewHolder internal constructor(
         setupChips(filter, sortMode == SORT_START)
 
         if ((context as MainActivity).isCompletedHeader){
-            val completedDate =  if (task.getTask().completionDate > 0 )  " [" + DateUtilities.getLongDateStringWithTime(task.getTask().completionDate, Locale.GERMAN)+"]" else ""
+            val completedDate =  if (task.getTask().completionDate > 0 )  " [" + DateUtilities.getLongDateStringWithTime(task.getTask().completionDate, Locale.getDefault())+"]" else ""
             val info = if(task.parentTitle == null) "" else task.parentTitle
             if (task.parentTitle==null){
                 nameView.append(completedDate);
