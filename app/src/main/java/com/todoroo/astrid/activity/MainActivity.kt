@@ -78,6 +78,9 @@ class MainActivity : InjectingAppCompatActivity(), TaskListFragmentCallbackHandl
     private var actionMode: ActionMode? = null
     private lateinit var binding: TaskListActivityBinding
 
+    public var isCompletedHeader = false;
+
+
     /** @see android.app.Activity.onCreate
      */
     override fun onCreate(savedInstanceState: Bundle?) {

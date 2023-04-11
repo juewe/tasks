@@ -23,6 +23,7 @@ internal object TaskListQueryRecursive {
                     field("(${Query.select(field("group_concat(distinct(tag_uid))")).from(Tag.TABLE).where(Task.ID.eq(Tag.TASK))} GROUP BY ${Tag.TASK})").`as`("tags"),
                     field("indent"),
                     field("sort_group").`as`("sortGroup"),
+                    field("(select title from tasks it where it._id = tasks.parent)").`as`("parentTitle"),
                     field("children"),
                     field("primary_sort").`as`("primarySort"),
                     field("secondary_sort").`as`("secondarySort"),

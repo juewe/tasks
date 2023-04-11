@@ -15,9 +15,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.accompanist.themeadapter.appcompat.AppCompatTheme
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.andlib.utility.DateUtilities.now
+import com.todoroo.astrid.activity.MainActivity
 import com.todoroo.astrid.api.Filter
 import com.todoroo.astrid.core.SortHelper.SORT_DUE
 import com.todoroo.astrid.core.SortHelper.SORT_START
+import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.ui.CheckableImageView
 import org.tasks.R
 import org.tasks.compose.ChipGroup
@@ -141,6 +143,17 @@ class TaskViewHolder internal constructor(
         setupTitleAndCheckbox()
         setupDueDate(sortMode == SORT_DUE)
         setupChips(filter, sortMode == SORT_START)
+
+        if ((context as MainActivity).isCompletedHeader){
+            val completedDate =  if (task.getTask().completionDate > 0 )  " [" + DateUtilities.getLongDateStringWithTime(task.getTask().completionDate, Locale.GERMAN)+"]" else ""
+            val info = if(task.parentTitle == null) "" else task.parentTitle
+            if (task.parentTitle==null){
+                nameView.append(completedDate);
+            } else{
+                markdown.setMarkdown(description, info + " " + completedDate);
+                description.visibility = if ((context as MainActivity).isCompletedHeader) View.VISIBLE else View.GONE;
+            }
+        } else
         if (preferences.getBoolean(R.string.p_show_description, true)) {
             markdown.setMarkdown(description, task.notes)
             description.visibility = if (task.hasNotes()) View.VISIBLE else View.GONE

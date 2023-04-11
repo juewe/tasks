@@ -388,6 +388,7 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
     }
 
     private fun searchByQuery(query: String?) {
+        if (callbacks is MainActivity) (callbacks as MainActivity).isCompletedHeader = false
         searchJob?.cancel()
         searchJob = lifecycleScope.launch {
             delay(SEARCH_DEBOUNCE_TIMEOUT)

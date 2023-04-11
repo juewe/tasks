@@ -15,6 +15,7 @@ public class TaskContainer {
   public int children;
   public Long sortGroup;
   public long primarySort;
+  public String parentTitle;
   public long secondarySort;
   public int indent;
   private int targetIndent;
@@ -45,7 +46,6 @@ public class TaskContainer {
   public String getTitle() {
     return task.getTitle();
   }
-
   public boolean isHidden() {
     return task.isHidden();
   }
