@@ -151,7 +151,7 @@ class TaskViewHolder internal constructor(
                 nameView.append(completedDate);
             } else{
                 markdown.setMarkdown(description, info + " " + completedDate);
-                description.visibility = if ((context as MainActivity).isCompletedHeader) View.VISIBLE else View.GONE;
+                description.visibility = View.VISIBLE
             }
         } else
         if (preferences.getBoolean(R.string.p_show_description, true)) {

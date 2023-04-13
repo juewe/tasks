@@ -36,7 +36,7 @@ class HeaderViewHolder(
         } else {
             row.visibility = View.VISIBLE
             this.title.text = header
-            if (header=="Completed") (context as MainActivity).isCompletedHeader = true else (context as MainActivity).isCompletedHeader = false
+            if (header==context.getString(R.string.completed)) (context as MainActivity).isCompletedHeader = true else (context as MainActivity).isCompletedHeader = false
             this.title.setTextColor(section.headerColor(context, sortMode))
             rotation = if (section.collapsed) -180f else 0f
             chevron.rotation = rotation
