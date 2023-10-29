@@ -24,6 +24,7 @@ import org.tasks.Strings.isNullOrEmpty
 import org.tasks.activities.CameraActivity
 import org.tasks.databinding.FragmentCommentBarBinding
 import org.tasks.dialogs.DialogBuilder
+import org.tasks.extensions.Context.hideKeyboard
 import org.tasks.files.ImageHelper
 import org.tasks.preferences.Device
 import org.tasks.preferences.Preferences
@@ -47,7 +48,10 @@ class CommentBarFragment : Fragment() {
     lateinit var viewModel: TaskEditViewModel
 
     override fun onCreateView(
-            inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+            inflater: LayoutInflater,
+            container: ViewGroup?,
+            savedInstanceState: Bundle?
+    ): View {
         viewModel = ViewModelProvider(requireParentFragment())[TaskEditViewModel::class.java]
         val view = bind(container)
         createView(savedInstanceState)
@@ -66,7 +70,7 @@ class CommentBarFragment : Fragment() {
         commentField.setHorizontallyScrolling(false)
         commentField.maxLines = Int.MAX_VALUE
         if (
-            preferences.getBoolean(R.string.p_show_task_edit_comments, true) &&
+            preferences.getBoolean(R.string.p_show_task_edit_comments, false) &&
             viewModel.isWritable
         ) {
             commentBar.visibility = View.VISIBLE
@@ -145,7 +149,7 @@ class CommentBarFragment : Fragment() {
 
     private fun addComment() {
         addComment(commentField.text.toString())
-        AndroidUtilities.hideSoftInputForViews(activity, commentField)
+        activity.hideKeyboard(commentField)
     }
 
     private fun setPictureButtonToPendingPicture() {
@@ -168,7 +172,7 @@ class CommentBarFragment : Fragment() {
 
     private fun resetPictureButton() {
         val typedValue = TypedValue()
-        activity.theme.resolveAttribute(R.attr.colorOnPrimary, typedValue, true)
+        activity.theme.resolveAttribute(com.google.android.material.R.attr.colorOnPrimary, typedValue, true)
         val drawable = activity.getDrawable(R.drawable.ic_outline_photo_camera_24px)!!.mutate()
         drawable.setTint(typedValue.data)
         pictureButton.setImageDrawable(drawable)

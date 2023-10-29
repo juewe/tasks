@@ -6,7 +6,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.*
+import androidx.compose.material.ChipDefaults
+import androidx.compose.material.ContentAlpha
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.FilterChip
+import androidx.compose.material.Icon
+import androidx.compose.material.LocalMinimumInteractiveComponentEnforcement
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.runtime.Composable
@@ -21,7 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.google.accompanist.themeadapter.appcompat.AppCompatTheme
+import com.google.android.material.composethemeadapter.MdcTheme
 import org.tasks.R
 import org.tasks.themes.CustomIcons
 
@@ -55,7 +62,7 @@ fun Chip(
     clear: (() -> Unit)? = null,
 ) {
     CompositionLocalProvider(
-        LocalMinimumTouchTargetEnforcement provides false
+        LocalMinimumInteractiveComponentEnforcement provides false
     ) {
         FilterChip(
             selected = false,
@@ -115,7 +122,7 @@ private fun ChipIcon(iconRes: Int?) {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun TasksChipIconAndTextPreview() {
-    AppCompatTheme {
+    MdcTheme {
         Chip(
             text = "Home",
             icon = CustomIcons.getIconResId(CustomIcons.LABEL),
@@ -129,7 +136,7 @@ fun TasksChipIconAndTextPreview() {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun TasksChipIconTextAndClearPreview() {
-    AppCompatTheme {
+    MdcTheme {
         Chip(
             text = "Home",
             icon = CustomIcons.getIconResId(CustomIcons.LABEL),
@@ -144,7 +151,7 @@ fun TasksChipIconTextAndClearPreview() {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun TasksChipIconPreview() {
-    AppCompatTheme {
+    MdcTheme {
         Chip(
             text = null,
             icon = CustomIcons.getIconResId(CustomIcons.LABEL),
@@ -158,7 +165,7 @@ fun TasksChipIconPreview() {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun TasksChipTextPreview() {
-    AppCompatTheme {
+    MdcTheme {
         Chip(
             text = "Home",
             icon = null,

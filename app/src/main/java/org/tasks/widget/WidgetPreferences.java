@@ -72,10 +72,6 @@ public class WidgetPreferences implements QueryPreferences {
     return getBoolean(R.string.p_widget_show_start_dates, true);
   }
 
-  boolean disableGroups() {
-    return getBoolean(R.string.p_widget_disable_groups, false);
-  }
-
   boolean showPlaces() {
     return getBoolean(R.string.p_widget_show_places, true);
   }
@@ -257,6 +253,11 @@ public class WidgetPreferences implements QueryPreferences {
   }
 
   @Override
+  public int getGroupMode() {
+    return getInt(R.string.p_widget_group, SortHelper.GROUP_NONE);
+  }
+
+  @Override
   public boolean isManualSort() {
     return getBoolean(R.string.p_widget_sort_manual, false);
   }
@@ -267,13 +268,18 @@ public class WidgetPreferences implements QueryPreferences {
   }
 
   @Override
-  public boolean isReverseSort() {
-    return getBoolean(R.string.p_widget_sort_reverse, false);
+  public boolean getSortAscending() {
+    return getBoolean(R.string.p_widget_sort_ascending, true);
+  }
+
+  @Override
+  public boolean getGroupAscending() {
+    return getBoolean(R.string.p_widget_group_ascending, false);
   }
 
   @Override
   public boolean getShowHidden() {
-    return getBoolean(R.string.p_widget_show_hidden, false);
+    return getBoolean(R.string.p_widget_show_hidden, true);
   }
 
   @Override
@@ -290,18 +296,18 @@ public class WidgetPreferences implements QueryPreferences {
   }
 
   @Override
-  public boolean getSortCompletedByCompletionDate() {
-    return preferences.getSortCompletedByCompletionDate();
-  }
-
-  @Override
-  public boolean usePagedQueries() {
-    return preferences.usePagedQueries();
+  public void setCompletedTasksAtBottom(boolean value) {
+    preferences.setBoolean(R.string.p_completed_tasks_at_bottom, value);
   }
 
   @Override
   public void setSortMode(int sortMode) {
     setInt(R.string.p_widget_sort, sortMode);
+  }
+
+  @Override
+  public void setGroupMode(int groupMode) {
+    setInt(R.string.p_widget_group, groupMode);
   }
 
   @Override
@@ -315,12 +321,57 @@ public class WidgetPreferences implements QueryPreferences {
   }
 
   @Override
-  public void setReverseSort(boolean isReverseSort) {
-    setBoolean(R.string.p_widget_sort_reverse, isReverseSort);
+  public void setSortAscending(boolean ascending) {
+    setBoolean(R.string.p_widget_sort_ascending, ascending);
+  }
+
+  @Override
+  public void setGroupAscending(boolean ascending) {
+    setBoolean(R.string.p_widget_group_ascending, ascending);
   }
 
   @Override
   public void setAlwaysDisplayFullDate(boolean noWeekday) {
     preferences.setAlwaysDisplayFullDate(noWeekday);
+  }
+
+  @Override
+  public int getCompletedMode() {
+    return preferences.getCompletedMode();
+  }
+
+  @Override
+  public void setCompletedMode(int mode) {
+    preferences.setCompletedMode(mode);
+  }
+
+  @Override
+  public boolean getCompletedAscending() {
+    return preferences.getCompletedAscending();
+  }
+
+  @Override
+  public void setCompletedAscending(boolean ascending) {
+    preferences.setCompletedAscending(ascending);
+  }
+
+  @Override
+  public int getSubtaskMode() {
+    return preferences.getSubtaskMode();
+  }
+
+  @Override
+  public void setSubtaskMode(int mode) {
+    preferences.setSubtaskMode(mode);
+  }
+
+  @Override
+  public boolean getSubtaskAscending() {
+    return preferences.getSubtaskAscending();
+  }
+
+  @Override
+  public void setSubtaskAscending(boolean ascending) {
+    preferences.setSubtaskAscending(ascending);
   }
 }

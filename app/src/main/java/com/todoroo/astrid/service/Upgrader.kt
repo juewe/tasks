@@ -19,7 +19,21 @@ import org.tasks.caldav.iCalendar
 import org.tasks.caldav.iCalendar.Companion.fromVtodo
 import org.tasks.caldav.iCalendar.Companion.order
 import org.tasks.caldav.iCalendar.Companion.parent
-import org.tasks.data.*
+import org.tasks.data.CaldavDao
+import org.tasks.data.CaldavTask
+import org.tasks.data.CaldavTaskContainer
+import org.tasks.data.Filter
+import org.tasks.data.FilterDao
+import org.tasks.data.GoogleTaskListDao
+import org.tasks.data.Location
+import org.tasks.data.LocationDao
+import org.tasks.data.Tag
+import org.tasks.data.TagDao
+import org.tasks.data.TagData
+import org.tasks.data.TagDataDao
+import org.tasks.data.TaskAttachmentDao
+import org.tasks.data.UpgraderDao
+import org.tasks.data.UserActivityDao
 import org.tasks.preferences.DefaultFilterProvider
 import org.tasks.preferences.Preferences
 import org.tasks.widget.AppWidgetManager
@@ -48,6 +62,7 @@ class Upgrader @Inject constructor(
         private val upgrade_11_3: Lazy<Upgrade_11_3>,
         private val upgrade_11_12_3: Lazy<Upgrade_11_12_3>,
         private val upgrade_12_4: Lazy<Upgrade_12_4>,
+        private val upgrade_13_2: Lazy<Upgrade_13_2>,
 ) {
 
     fun upgrade(from: Int, to: Int) {
@@ -73,7 +88,7 @@ class Upgrader @Inject constructor(
             run(from, V9_7_3) { caldavDao.updateParents() }
             run(from, V10_0_2) {
                 filterDao.getFilters()
-                        .filter { it.getSql().trim() == "WHERE" }
+                        .filter { it.dirtyHack.trim() == "WHERE" }
                         .forEach { filterDao.delete(it) }
             }
             run(from, Upgrade_11_3.VERSION) {
@@ -94,8 +109,9 @@ class Upgrader @Inject constructor(
             run(from, V12_6) {
                 setInstallDetails(from)
             }
-            run(from, V13_2) {
+            run(from, Upgrade_13_2.VERSION) {
                 caldavDao.updateParents()
+                upgrade_13_2.get().rebuildFilters()
             }
             preferences.setBoolean(R.string.p_just_updated, true)
         } else {
@@ -139,8 +155,11 @@ class Upgrader @Inject constructor(
             tagDataDao.update(tagData)
         }
         for (filter in filterDao.getFilters()) {
-            filter.setColor(getAndroidColor(filter.getColor()!!))
-            filterDao.update(filter)
+            filterDao.update(
+                filter.copy(
+                    color = getAndroidColor(filter.color ?: 0)
+                )
+            )
         }
     }
 
@@ -205,25 +224,34 @@ class Upgrader @Inject constructor(
 
     private suspend fun migrateGoogleTaskFilters() {
         for (filter in filterDao.getFilters()) {
-            filter.setSql(migrateGoogleTaskFilters(filter.getSql()))
-            filter.criterion = migrateGoogleTaskFilters(filter.criterion)
-            filterDao.update(filter)
+            filterDao.update(
+                filter.copy(
+                    sql = migrateGoogleTaskFilters(filter.dirtyHack),
+                    criterion = migrateGoogleTaskFilters(filter.criterion),
+                )
+            )
         }
     }
 
     private suspend fun migrateCaldavFilters() {
         for (filter in filterDao.getFilters()) {
-            filter.setSql(migrateCaldavFilters(filter.getSql()))
-            filter.criterion = migrateCaldavFilters(filter.criterion)
-            filterDao.update(filter)
+            filterDao.update(
+                filter.copy(
+                    sql = migrateCaldavFilters(filter.dirtyHack),
+                    criterion = migrateCaldavFilters(filter.criterion),
+                )
+            )
         }
     }
 
     private suspend fun migrateFilters() {
         for (filter in filterDao.getFilters()) {
-            filter.setSql(migrateMetadata(filter.getSql()))
-            filter.criterion = migrateMetadata(filter.criterion)
-            filterDao.update(filter)
+            filterDao.update(
+                filter.copy(
+                    sql = migrateMetadata(filter.dirtyHack),
+                    criterion = migrateMetadata(filter.criterion),
+                )
+            )
         }
     }
 
@@ -340,7 +368,6 @@ class Upgrader @Inject constructor(
         const val V12_4 = 120400
         const val V12_6 = 120601
         const val V12_8 = 120800
-        const val V13_2 = 130200
 
         @JvmStatic
         fun getAndroidColor(context: Context, index: Int): Int {
@@ -376,5 +403,8 @@ class Upgrader @Inject constructor(
                 else -> def
             }
         }
+
+        private val Filter.dirtyHack: String
+            get() = sql!!.replace("tasks.userId=0", "1")
     }
 }

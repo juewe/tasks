@@ -4,12 +4,6 @@
 
   <SwitchPreferenceCompat
     android:defaultValue="false"
-    android:key="@string/p_use_paged_queries"
-    android:summary="@string/improve_performance_summary"
-    android:title="@string/improve_performance" />
-
-  <SwitchPreferenceCompat
-    android:defaultValue="false"
     android:key="@string/p_astrid_sort_enabled"
     android:title="@string/astrid_sort_order"
     android:summary="@string/astrid_sort_order_summary" />
@@ -28,12 +22,6 @@
     android:title="@string/EPr_cal_end_or_start_at_due_time"
     app:allowDividerAbove="true"
     app:singleLineTitle="false" />
-
-  <SwitchPreferenceCompat
-    android:defaultValue="false"
-    android:key="@string/p_calendar_reminders"
-    android:summary="@string/CRA_calendar_reminders_pref_desc_enabled"
-    android:title="@string/CRA_calendar_reminders_pref_title" />
 
   <Preference
     android:key="@string/EPr_manage_delete_completed_gcal"

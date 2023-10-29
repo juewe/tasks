@@ -1,126 +1,142 @@
 package org.tasks.ui
 
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Observer
+import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.LivePagedListBuilder
-import androidx.paging.PagedList
-import androidx.sqlite.db.SimpleSQLiteQuery
-import com.todoroo.andlib.utility.AndroidUtilities
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.astrid.api.Filter
+import com.todoroo.astrid.api.SearchFilter
+import com.todoroo.astrid.core.BuiltInFilterExposer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.tasks.BuildConfig
-import org.tasks.data.SubtaskInfo
+import org.tasks.LocalBroadcastManager
+import org.tasks.R
+import org.tasks.Tasks
+import org.tasks.analytics.Firebase
+import org.tasks.billing.Inventory
+import org.tasks.billing.PurchaseActivity
+import org.tasks.compose.throttleLatest
 import org.tasks.data.TaskContainer
 import org.tasks.data.TaskDao
 import org.tasks.data.TaskListQuery.getQuery
+import org.tasks.extensions.Context.openUri
 import org.tasks.preferences.Preferences
-import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
+@SuppressLint("StaticFieldLeak")
 class TaskListViewModel @Inject constructor(
-        private val preferences: Preferences,
-        private val taskDao: TaskDao) : ViewModel(), Observer<PagedList<TaskContainer>> {
+    @ApplicationContext private val context: Context,
+    private val preferences: Preferences,
+    private val taskDao: TaskDao,
+    private val localBroadcastManager: LocalBroadcastManager,
+    private val inventory: Inventory,
+    private val firebase: Firebase,
+) : ViewModel() {
 
-    private var _tasks = MutableLiveData<List<TaskContainer>>()
-    val tasks: LiveData<List<TaskContainer>>
-        get() = _tasks
-    private var filter: Filter? = null
-    private var manualSortFilter = false
-    private var internal: LiveData<PagedList<TaskContainer>>? = null
+    data class State(
+        val filter: Filter? = null,
+        val now: Long = DateUtilities.now(),
+        val searchQuery: String? = null,
+        val tasks: List<TaskContainer> = emptyList(),
+        val begForSubscription: Boolean = false,
+        val syncOngoing: Boolean = false,
+    )
 
-    fun setFilter(filter: Filter) {
-        manualSortFilter = (filter.supportsManualSort() && preferences.isManualSort
-                || filter.supportsAstridSorting() && preferences.isAstridSort)
-        if (filter != this.filter || filter.getSqlQuery() != this.filter!!.getSqlQuery()) {
-            this.filter = filter
-            _tasks = MutableLiveData()
+    private val _state = MutableStateFlow(State())
+    val state = _state.asStateFlow()
+
+    private val refreshReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
             invalidate()
         }
     }
 
-    fun observe(owner: LifecycleOwner, observer: (List<TaskContainer>) -> Unit) =
-            _tasks.observe(owner, observer)
-
-    fun searchByFilter(filter: Filter?) {
-        this.filter = filter
-        invalidate()
+    fun setFilter(filter: Filter) {
+        _state.update {
+            it.copy(filter = filter)
+        }
     }
 
-        private fun removeObserver() = internal?.removeObserver(this)
+    fun setSearchQuery(query: String?) {
+        _state.update { it.copy(searchQuery = query?.trim()) }
+    }
 
     fun invalidate() {
-        AndroidUtilities.assertMainThread()
-        removeObserver()
-        if (filter == null) {
-            return
+        _state.update {
+            it.copy(
+                now = DateUtilities.now(),
+                syncOngoing = preferences.isSyncOngoing,
+            )
         }
-        try {
-            if (manualSortFilter || !preferences.usePagedQueries()) {
-                viewModelScope.launch {
-                    val subtasks = taskDao.getSubtaskInfo()
-                    performNonPagedQuery(subtasks)
-                }
+    }
+
+    fun dismissBanner(clickedPurchase: Boolean) {
+        _state.update {
+            it.copy(begForSubscription = false)
+        }
+        preferences.lastSubscribeRequest = DateUtilities.now()
+        firebase.logEvent(R.string.event_banner_sub, R.string.param_click to clickedPurchase)
+        if (clickedPurchase) {
+            if (Tasks.IS_GOOGLE_PLAY) {
+                context.startActivity(Intent(context, PurchaseActivity::class.java))
             } else {
-                performPagedListQuery()
+                preferences.lastSubscribeRequest = DateUtilities.now()
+                context.openUri(R.string.url_donate)
             }
-        } catch (e: Exception) {
-            Timber.e(e)
         }
     }
 
-    private suspend fun performNonPagedQuery(subtasks: SubtaskInfo) {
-        _tasks.value = taskDao.fetchTasks(subtasks) { getQuery(preferences, filter!!, it) }
-    }
+    init {
+        localBroadcastManager.registerRefreshReceiver(refreshReceiver)
 
-    private fun performPagedListQuery() {
-        val queries = getQuery(preferences, filter!!, SubtaskInfo())
-        if (BuildConfig.DEBUG && queries.size != 1) {
-            throw RuntimeException("Invalid queries")
-        }
-        val query = SimpleSQLiteQuery(queries[0])
-        Timber.d("paged query: %s", query.sql)
-        val factory = taskDao.getTaskFactory(query)
-        val builder = LivePagedListBuilder(factory, PAGED_LIST_CONFIG)
-        val current = _tasks.value
-        if (current is PagedList<*>) {
-            val lastKey = (current as PagedList<TaskContainer>).lastKey
-            if (lastKey is Int) {
-                builder.setInitialLoadKey(lastKey as Int?)
+        _state
+            .filter { it.filter != null }
+            .throttleLatest(333)
+            .map {
+                val filter = when {
+                    it.searchQuery == null -> it.filter!!
+                    it.searchQuery.isBlank() -> BuiltInFilterExposer.getMyTasksFilter(context.resources)
+                    else -> context.createSearchQuery(it.searchQuery)
+                }
+                taskDao.fetchTasks { getQuery(preferences, filter) }
             }
-        }
-        if (BuildConfig.DEBUG) {
-            builder.setFetchExecutor { command: Runnable ->
-                viewModelScope.launch(Dispatchers.IO) {
-                    val start = DateUtilities.now()
-                    command.run()
-                    Timber.d("*** paged list execution took %sms", DateUtilities.now() - start)
+            .onEach { tasks ->
+                _state.update {
+                    it.copy(tasks = tasks)
+                }
+            }
+            .flowOn(Dispatchers.Default)
+            .launchIn(viewModelScope)
+
+        viewModelScope.launch(Dispatchers.Default) {
+            if (!inventory.hasPro && !firebase.subscribeCooldown) {
+                _state.update {
+                    it.copy(begForSubscription = true)
                 }
             }
         }
-        internal = builder.build()
-        internal!!.observeForever(this)
     }
 
     override fun onCleared() {
-        removeObserver()
-    }
-
-    val value: List<TaskContainer>
-        get() = _tasks.value ?: emptyList()
-
-    override fun onChanged(taskContainers: PagedList<TaskContainer>) {
-        _tasks.value = taskContainers
+        localBroadcastManager.unregisterReceiver(refreshReceiver)
     }
 
     companion object {
-        private val PAGED_LIST_CONFIG = PagedList.Config.Builder().setPageSize(20).build()
+        fun Context.createSearchQuery(query: String): Filter =
+            SearchFilter(getString(R.string.FLA_search_filter, query), query)
     }
 }

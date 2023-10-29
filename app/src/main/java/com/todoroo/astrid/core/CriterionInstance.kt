@@ -6,10 +6,6 @@ import com.todoroo.astrid.api.CustomFilterCriterion
 import com.todoroo.astrid.api.MultipleSelectCriterion
 import com.todoroo.astrid.api.TextInputCriterion
 import com.todoroo.astrid.helper.UUIDHelper
-import org.tasks.Strings.isNullOrEmpty
-import org.tasks.filters.FilterCriteriaProvider
-import timber.log.Timber
-import java.util.*
 
 class CriterionInstance {
     lateinit var criterion: CustomFilterCriterion
@@ -38,20 +34,27 @@ class CriterionInstance {
     // $NON-NLS-1$
     val titleFromCriterion: String
         get() {
-            if (criterion is MultipleSelectCriterion) {
-                if (selectedIndex >= 0 && (criterion as MultipleSelectCriterion).entryTitles != null && selectedIndex < (criterion as MultipleSelectCriterion).entryTitles.size) {
-                    val title = (criterion as MultipleSelectCriterion).entryTitles[selectedIndex]
-                    return criterion.text.replace("?", title)
+            when (criterion) {
+                is MultipleSelectCriterion -> {
+                    if (selectedIndex >= 0 && (criterion as MultipleSelectCriterion).entryTitles != null && selectedIndex < (criterion as MultipleSelectCriterion).entryTitles.size) {
+                        val title = (criterion as MultipleSelectCriterion).entryTitles[selectedIndex]
+                        return criterion.text.replace("?", title)
+                    }
+                    return criterion.text
                 }
-                return criterion.text
-            } else if (criterion is TextInputCriterion) {
-                return if (selectedText == null) {
-                    criterion.text
-                } else criterion.text.replace("?", selectedText!!)
-            } else if (criterion is BooleanCriterion) {
-                return criterion.name
+
+                is TextInputCriterion -> {
+                    return if (selectedText == null) {
+                        criterion.text
+                    } else criterion.text.replace("?", selectedText!!)
+                }
+
+                is BooleanCriterion -> {
+                    return criterion.name
+                }
+                // $NON-NLS-1$
+                else -> throw UnsupportedOperationException("Unknown criterion type")
             }
-            throw UnsupportedOperationException("Unknown criterion type") // $NON-NLS-1$
         }
 
     // $NON-NLS-1$
@@ -60,16 +63,23 @@ class CriterionInstance {
             if (type == TYPE_UNIVERSE) {
                 return null
             }
-            if (criterion is MultipleSelectCriterion) {
-                return if (selectedIndex >= 0 && (criterion as MultipleSelectCriterion).entryValues != null && selectedIndex < (criterion as MultipleSelectCriterion).entryValues.size) {
-                    (criterion as MultipleSelectCriterion).entryValues[selectedIndex]
-                } else criterion.text
-            } else if (criterion is TextInputCriterion) {
-                return selectedText
-            } else if (criterion is BooleanCriterion) {
-                return criterion.name
+            when (criterion) {
+                is MultipleSelectCriterion -> {
+                    return if (selectedIndex >= 0 && (criterion as MultipleSelectCriterion).entryValues != null && selectedIndex < (criterion as MultipleSelectCriterion).entryValues.size) {
+                        (criterion as MultipleSelectCriterion).entryValues[selectedIndex]
+                    } else criterion.text
+                }
+
+                is TextInputCriterion -> {
+                    return selectedText
+                }
+
+                is BooleanCriterion -> {
+                    return criterion.name
+                }
+                // $NON-NLS-1$
+                else -> throw UnsupportedOperationException("Unknown criterion type")
             }
-            throw UnsupportedOperationException("Unknown criterion type") // $NON-NLS-1$
         }
 
     private fun serialize(): String {
@@ -121,52 +131,10 @@ class CriterionInstance {
         const val TYPE_INTERSECT = 2
         const val TYPE_UNIVERSE = 3
 
-        suspend fun fromString(
-                provider: FilterCriteriaProvider, criterion: String): List<CriterionInstance> {
-            if (isNullOrEmpty(criterion)) {
-                return emptyList()
-            }
-            val entries: MutableList<CriterionInstance> = ArrayList()
-            for (row in criterion.trim().split("\n")) {
-                val split = row
-                        .split(AndroidUtilities.SERIALIZATION_SEPARATOR)
-                        .map { unescape(it) }
-                if (split.size != 4 && split.size != 5) {
-                    Timber.e("invalid row: %s", row)
-                    return emptyList()
-                }
-                val entry = CriterionInstance()
-                entry.criterion = provider.getFilterCriteria(split[0])
-                val value = split[1]
-                if (entry.criterion is TextInputCriterion) {
-                    entry.selectedText = value
-                } else if (entry.criterion is MultipleSelectCriterion) {
-                    val multipleSelectCriterion = entry.criterion as MultipleSelectCriterion?
-                    if (multipleSelectCriterion!!.entryValues != null) {
-                        entry.selectedIndex = multipleSelectCriterion.entryValues.indexOf(value)
-                    }
-                } else {
-                    Timber.d("Ignored value %s for %s", value, entry.criterion)
-                }
-                entry.type = split[3].toInt()
-                entry.criterion.sql = split[4]
-                Timber.d("%s -> %s", row, entry)
-                entries.add(entry)
-            }
-            return entries
-        }
-
         private fun escape(item: String?): String {
             return item?.replace(
                     AndroidUtilities.SERIALIZATION_SEPARATOR, AndroidUtilities.SEPARATOR_ESCAPE)
                     ?: "" // $NON-NLS-1$
-        }
-
-        private fun unescape(item: String?): String {
-            return if (isNullOrEmpty(item)) {
-                ""
-            } else item!!.replace(
-                    AndroidUtilities.SEPARATOR_ESCAPE, AndroidUtilities.SERIALIZATION_SEPARATOR)
         }
 
         fun serialize(criterion: List<CriterionInstance>): String {

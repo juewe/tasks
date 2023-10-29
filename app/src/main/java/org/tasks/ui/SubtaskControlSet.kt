@@ -4,15 +4,14 @@ import android.app.Activity
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.google.accompanist.themeadapter.appcompat.AppCompatTheme
+import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.sql.Criterion
 import com.todoroo.andlib.sql.QueryTemplate
 import com.todoroo.andlib.utility.DateUtilities.now
-import com.todoroo.astrid.api.Filter
+import com.todoroo.astrid.api.FilterImpl
 import com.todoroo.astrid.dao.TaskDao
 import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.service.TaskCompleter
@@ -41,11 +40,11 @@ class SubtaskControlSet : TaskEditControlFragment() {
     @Inject lateinit var colorProvider: ColorProvider
     @Inject lateinit var preferences: Preferences
 
-    lateinit var listViewModel: TaskListViewModel
+    private lateinit var listViewModel: TaskListViewModel
 
     override fun createView(savedInstanceState: Bundle?) {
         viewModel.task.takeIf { it.id > 0 }?.let {
-            listViewModel.setFilter(Filter("subtasks", getQueryTemplate(it)))
+            listViewModel.setFilter(FilterImpl("subtasks", getQueryTemplate(it)))
         }
     }
 
@@ -53,13 +52,13 @@ class SubtaskControlSet : TaskEditControlFragment() {
         (parent as ComposeView).apply {
             listViewModel = ViewModelProvider(requireParentFragment())[TaskListViewModel::class.java]
             setContent {
-                AppCompatTheme {
+                MdcTheme {
                     SubtaskRow(
                         originalFilter = viewModel.originalList,
                         filter = viewModel.selectedList.collectAsStateLifecycleAware().value,
                         hasParent = viewModel.hasParent,
                         desaturate = preferences.desaturateDarkMode,
-                        existingSubtasks = listViewModel.tasks.observeAsState(initial = emptyList()).value,
+                        existingSubtasks = listViewModel.state.collectAsStateLifecycleAware().value.tasks,
                         newSubtasks = viewModel.newSubtasks.collectAsStateLifecycleAware().value,
                         openSubtask = this@SubtaskControlSet::openSubtask,
                         completeExistingSubtask = this@SubtaskControlSet::complete,
@@ -68,10 +67,9 @@ class SubtaskControlSet : TaskEditControlFragment() {
                         completeNewSubtask = {
                             viewModel.newSubtasks.value =
                                 ArrayList(viewModel.newSubtasks.value).apply {
-                                    val modified = it.clone().apply {
-                                        completionDate =
-                                            if (isCompleted) 0 else now()
-                                    }
+                                    val modified = it.copy(
+                                        completionDate = if (it.isCompleted) 0 else now()
+                                    )
                                     set(indexOf(it), modified)
                                 }
                         },
@@ -106,13 +104,14 @@ class SubtaskControlSet : TaskEditControlFragment() {
     }
 
     companion object {
-        const val TAG = R.string.TEA_ctrl_subtask_pref
-        private fun getQueryTemplate(task: Task): QueryTemplate = QueryTemplate()
+        val TAG = R.string.TEA_ctrl_subtask_pref
+        private fun getQueryTemplate(task: Task): String = QueryTemplate()
             .where(
                 Criterion.and(
                     activeAndVisible(),
                     Task.PARENT.eq(task.id)
                 )
             )
+            .toString()
     }
 }

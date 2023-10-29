@@ -2,7 +2,6 @@ package org.tasks.widget
 
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.view.View
@@ -10,6 +9,7 @@ import android.widget.RemoteViews
 import android.widget.RemoteViewsService.RemoteViewsFactory
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.andlib.utility.DateUtilities.now
+import com.todoroo.astrid.api.AstridOrderingFilter
 import com.todoroo.astrid.api.Filter
 import com.todoroo.astrid.core.SortHelper
 import com.todoroo.astrid.data.Task
@@ -18,21 +18,22 @@ import kotlinx.coroutines.runBlocking
 import org.tasks.BuildConfig
 import org.tasks.LocalBroadcastManager
 import org.tasks.R
-import org.tasks.data.SubtaskInfo
 import org.tasks.data.TaskContainer
 import org.tasks.data.TaskDao
 import org.tasks.data.TaskListQuery.getQuery
 import org.tasks.date.DateTimeUtils
+import org.tasks.extensions.Context.isNightMode
 import org.tasks.markdown.Markdown
 import org.tasks.preferences.DefaultFilterProvider
 import org.tasks.preferences.Preferences
+import org.tasks.tasklist.HeaderFormatter
 import org.tasks.tasklist.SectionedDataSource
 import org.tasks.tasklist.SectionedDataSource.Companion.HEADER_COMPLETED
 import org.tasks.time.DateTimeUtils.startOfDay
 import org.tasks.ui.CheckBoxProvider
 import timber.log.Timber
 import java.time.format.FormatStyle
-import java.util.*
+import java.util.Locale
 import kotlin.math.max
 
 internal class ScrollableViewsFactory(
@@ -46,7 +47,8 @@ internal class ScrollableViewsFactory(
     private val locale: Locale,
     private val chipProvider: ChipProvider,
     private val localBroadcastManager: LocalBroadcastManager,
-    private val markdown: Markdown
+    private val markdown: Markdown,
+    private val headerFormatter: HeaderFormatter,
 ) : RemoteViewsFactory {
     private val indentPadding: Int
     private var showDueDates = false
@@ -71,11 +73,13 @@ internal class ScrollableViewsFactory(
     private var showLists = false
     private var showTags = false
     private var collapsed = mutableSetOf(HEADER_COMPLETED)
-    private var sortMode = -1
+    private var groupMode = -1
+    private var subtaskMode = -1
     private var tasks = SectionedDataSource(
         emptyList(),
         disableHeaders = false,
-        sortMode = 0,
+        groupMode = SortHelper.GROUP_NONE,
+        subtaskMode = SortHelper.SORT_MANUAL,
         collapsed,
         preferences.completedTasksAtBottom,
     )
@@ -87,7 +91,7 @@ internal class ScrollableViewsFactory(
     private val checkIfDark: Boolean
         get() = when (widgetPreferences.themeIndex) {
             0 -> false
-            3 -> context.isDark
+            3 -> context.isNightMode
             else -> true
         }
 
@@ -97,9 +101,10 @@ internal class ScrollableViewsFactory(
         runBlocking {
             updateSettings()
             tasks = SectionedDataSource(
-                    taskDao.fetchTasks { getQuery(filter, it) },
+                    taskDao.fetchTasks { getQuery(filter) },
                     disableGroups,
-                    sortMode,
+                    groupMode,
+                    subtaskMode,
                     collapsed,
                     widgetPreferences.completedTasksAtBottom,
             )
@@ -145,13 +150,12 @@ internal class ScrollableViewsFactory(
         val section = tasks.getSection(position)
         val sortGroup = section.value
         val header: String? = if (filter?.supportsSorting() == true) {
-            section.headerString(
-                    context,
-                    locale,
-                    sortMode,
-                    showFullDate,
-                    FormatStyle.MEDIUM,
-                    compact
+            headerFormatter.headerStringBlocking(
+                value = section.value,
+                groupMode = groupMode,
+                alwaysDisplayFullDate = showFullDate,
+                style = FormatStyle.MEDIUM,
+                compact = compact,
             )
         } else {
             null
@@ -166,7 +170,7 @@ internal class ScrollableViewsFactory(
             R.id.header,
             section.headerColor(
                 context,
-                sortMode,
+                groupMode,
                 if (isDark) R.color.white_60 else R.color.black_60
             )
         )
@@ -186,7 +190,7 @@ internal class ScrollableViewsFactory(
     private fun buildUpdate(position: Int): RemoteViews? {
         try {
             val taskContainer = getTask(position) ?: return null
-            val task = taskContainer.getTask()
+            val task = taskContainer.task
             var textColorTitle = textColorPrimary
             val row = newRemoteView()
             if (task.isHidden) {
@@ -263,7 +267,7 @@ internal class ScrollableViewsFactory(
                 )
             }
             if (taskContainer.isHidden && showStartDates) {
-                val sortByDate = sortMode == SortHelper.SORT_START && !disableGroups
+                val sortByDate = groupMode == SortHelper.SORT_START && !disableGroups
                 chipProvider
                         .getStartDateChip(taskContainer, showFullDate, sortByDate)
                         ?.let { row.addView(R.id.chips, it) }
@@ -278,12 +282,12 @@ internal class ScrollableViewsFactory(
                         .getListChip(filter, taskContainer)
                         ?.let { row.addView(R.id.chips, it) }
             }
-            if (showTags && taskContainer.tags?.isNotBlank() == true) {
+            if (showTags && taskContainer.tagsString?.isNotBlank() == true) {
                 chipProvider
                         .getTagChips(filter, taskContainer)
                         .forEach { row.addView(R.id.chips, it) }
             }
-            val startPad = taskContainer.getIndent() * indentPadding
+            val startPad = taskContainer.indent * indentPadding
             row.setViewPadding(R.id.widget_row, startPad, 0, 0, 0)
             return row
         } catch (e: Exception) {
@@ -294,8 +298,8 @@ internal class ScrollableViewsFactory(
 
     private fun getTask(position: Int): TaskContainer? = tasks.getItem(position)
 
-    private suspend fun getQuery(filter: Filter?, subtasks: SubtaskInfo): List<String> {
-        val queries = getQuery(widgetPreferences, filter!!, subtasks)
+    private suspend fun getQuery(filter: Filter?): List<String> {
+        val queries = getQuery(widgetPreferences, filter!!)
         val last = queries.size - 1
         queries[last] =
                 subtasksHelper.applySubtasksToWidgetFilter(filter, widgetPreferences, queries[last])
@@ -313,9 +317,10 @@ internal class ScrollableViewsFactory(
                 row.setViewPadding(R.id.widget_due_end, hPad, vPad, hPad, vPad)
             }
             row.setViewVisibility(dueDateRes, View.VISIBLE)
-            val text = if (sortMode == SortHelper.SORT_DUE
-                && task.sortGroup >= now().startOfDay()
-                && !disableGroups
+            val text = if (
+                groupMode == SortHelper.SORT_DUE &&
+                (task.sortGroup ?: 0L) >= now().startOfDay() &&
+                !disableGroups
             ) {
                 task.takeIf { it.hasDueTime() }?.let {
                     DateUtilities.getTimeString(context, DateTimeUtils.newDateTime(task.dueDate))
@@ -360,10 +365,10 @@ internal class ScrollableViewsFactory(
         dueDateTextSize = max(10f, textSize - 2)
         filter = defaultFilterProvider.getFilterFromPreference(widgetPreferences.filterId)
         showDividers = widgetPreferences.showDividers()
-        disableGroups = widgetPreferences.disableGroups() || filter?.let {
+        disableGroups = filter?.let {
             !it.supportsSorting()
                     || (it.supportsManualSort() && widgetPreferences.isManualSort)
-                    || (it.supportsAstridSorting() && widgetPreferences.isAstridSort)
+                    || (it is AstridOrderingFilter && widgetPreferences.isAstridSort)
         } == true
         showPlaces = widgetPreferences.showPlaces()
         showSubtasks = widgetPreferences.showSubtasks()
@@ -371,13 +376,14 @@ internal class ScrollableViewsFactory(
         showLists = widgetPreferences.showLists()
         showTags = widgetPreferences.showTags()
         showFullDate = widgetPreferences.alwaysDisplayFullDate
-        widgetPreferences.sortMode.takeIf { it != sortMode }
-                ?.let {
-                    if (sortMode >= 0) {
-                        widgetPreferences.setCollapsed(mutableSetOf(HEADER_COMPLETED))
-                    }
-                    sortMode = it
+        widgetPreferences.groupMode.takeIf { it != groupMode }
+            ?.let {
+                if (groupMode != SortHelper.GROUP_NONE) {
+                    widgetPreferences.setCollapsed(mutableSetOf(HEADER_COMPLETED))
                 }
+                groupMode = it
+            }
+        subtaskMode = widgetPreferences.subtaskMode
         collapsed = widgetPreferences.collapsed
         compact = widgetPreferences.compact
     }
@@ -385,11 +391,5 @@ internal class ScrollableViewsFactory(
     init {
         val metrics = context.resources.displayMetrics
         indentPadding = (20 * metrics.density).toInt()
-    }
-
-    companion object {
-        val Context.isDark: Boolean
-            get() = (Configuration.UI_MODE_NIGHT_YES ==
-                    (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK))
     }
 }

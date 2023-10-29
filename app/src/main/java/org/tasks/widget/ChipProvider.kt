@@ -5,6 +5,7 @@ import android.widget.RemoteViews
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.astrid.api.CaldavFilter
 import com.todoroo.astrid.api.Filter
+import com.todoroo.astrid.api.GtasksFilter
 import com.todoroo.astrid.api.TagFilter
 import com.todoroo.astrid.data.Task
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,7 +18,7 @@ import org.tasks.themes.CustomIcons
 import org.tasks.time.DateTimeUtils.startOfDay
 import org.tasks.ui.ChipListCache
 import java.time.format.FormatStyle
-import java.util.*
+import java.util.Locale
 import javax.inject.Inject
 
 class ChipProvider @Inject constructor(
@@ -49,15 +50,15 @@ class ChipProvider @Inject constructor(
     fun getStartDateChip(task: TaskContainer, showFullDate: Boolean, sortByStartDate: Boolean): RemoteViews? {
         return if (task.isHidden) {
             val chip = newChip()
-            val time = if (sortByStartDate && task.sortGroup?.startOfDay() == task.startDate.startOfDay()) {
-                task.startDate
+            val time = if (sortByStartDate && task.sortGroup?.startOfDay() == task.task.hideUntil.startOfDay()) {
+                task.task.hideUntil
                         .takeIf { Task.hasDueTime(it) }
                         ?.let { DateUtilities.getTimeString(context, it.toDateTime()) }
                         ?: return null
             } else {
                 DateUtilities.getRelativeDateTime(
                         context,
-                        task.startDate,
+                        task.task.hideUntil,
                         locale,
                         FormatStyle.MEDIUM,
                         showFullDate,
@@ -73,11 +74,15 @@ class ChipProvider @Inject constructor(
     }
 
     fun getListChip(filter: Filter?, task: TaskContainer): RemoteViews? {
-        task.caldav
-                ?.takeIf { filter !is CaldavFilter }
-                ?.let { newChip(CaldavFilter(chipListCache.getCaldavList(it)), R.drawable.ic_list_24px) }
-                ?.let { return it }
-        return null
+        return task.caldav
+                ?.takeIf { filter !is CaldavFilter && filter !is GtasksFilter }
+                ?.let { chipListCache.getCaldavList(it) }
+                ?.let {
+                    newChip(
+                        filter = if (task.isGoogleTask) GtasksFilter(it) else CaldavFilter(it),
+                        defaultIcon = R.drawable.ic_list_24px
+                    )
+                }
     }
 
     fun getPlaceChip(filter: Filter?, task: TaskContainer): RemoteViews? {
@@ -88,13 +93,13 @@ class ChipProvider @Inject constructor(
     }
 
     fun getTagChips(filter: Filter?, task: TaskContainer): List<RemoteViews> {
-        val tags = task.tags?.split(",")?.toHashSet() ?: return emptyList()
+        val tags = task.tagsString?.split(",")?.toHashSet() ?: return emptyList()
         if (filter is TagFilter) {
             tags.remove(filter.uuid)
         }
         return tags
                 .mapNotNull(chipListCache::getTag)
-                .sortedBy(TagFilter::listingTitle)
+                .sortedBy(TagFilter::title)
                 .mapNotNull { newChip(it, R.drawable.ic_outline_label_24px) }
     }
 
@@ -103,7 +108,7 @@ class ChipProvider @Inject constructor(
             return null
         }
         val chip = newChip()
-        chip.setTextViewText(R.id.chip_text, filter.listingTitle)
+        chip.setTextViewText(R.id.chip_text, filter.title)
         val icon = filter.icon
                 .takeIf { it >= 0 }
                 ?.let { CustomIcons.getIconResId(it) }

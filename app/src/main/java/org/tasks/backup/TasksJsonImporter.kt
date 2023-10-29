@@ -10,6 +10,7 @@ import com.todoroo.astrid.dao.TaskDao
 import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.service.TaskCreator.Companion.getDefaultAlarms
 import com.todoroo.astrid.service.TaskMover
+import com.todoroo.astrid.service.Upgrade_13_2
 import com.todoroo.astrid.service.Upgrader
 import com.todoroo.astrid.service.Upgrader.Companion.V12_4
 import com.todoroo.astrid.service.Upgrader.Companion.V12_8
@@ -18,11 +19,27 @@ import com.todoroo.astrid.service.Upgrader.Companion.getAndroidColor
 import org.tasks.LocalBroadcastManager
 import org.tasks.R
 import org.tasks.caldav.VtodoCache
-import org.tasks.data.*
+import org.tasks.data.AlarmDao
+import org.tasks.data.Attachment
+import org.tasks.data.CaldavAccount
 import org.tasks.data.CaldavAccount.Companion.TYPE_GOOGLE_TASKS
-import org.tasks.data.Place.Companion.newPlace
+import org.tasks.data.CaldavCalendar
+import org.tasks.data.CaldavDao
+import org.tasks.data.CaldavTask
+import org.tasks.data.FilterDao
+import org.tasks.data.Geofence
+import org.tasks.data.LocationDao
+import org.tasks.data.Place
+import org.tasks.data.Tag
+import org.tasks.data.TagDao
+import org.tasks.data.TagData
+import org.tasks.data.TagDataDao
+import org.tasks.data.TaskAttachmentDao
+import org.tasks.data.TaskListMetadataDao
+import org.tasks.data.UserActivityDao
 import org.tasks.db.Migrations.repeatFrom
 import org.tasks.db.Migrations.withoutFrom
+import org.tasks.filters.FilterCriteriaProvider
 import org.tasks.preferences.Preferences
 import timber.log.Timber
 import java.io.FileNotFoundException
@@ -46,6 +63,7 @@ class TasksJsonImporter @Inject constructor(
         private val taskMover: TaskMover,
         private val taskListMetadataDao: TaskListMetadataDao,
         private val vtodoCache: VtodoCache,
+        private val filterCriteriaProvider: FilterCriteriaProvider,
     ) {
 
     private val result = ImportResult()
@@ -108,12 +126,19 @@ class TasksJsonImporter @Inject constructor(
                     )
                 }
             }
-            backupContainer.filters?.forEach { filter ->
-                filter.setColor(themeToColor(context, version, filter.getColor()!!))
-                if (filterDao.getByName(filter.title!!) == null) {
-                    filterDao.insert(filter)
+            backupContainer.filters
+                ?.map {
+                    if (version < Upgrade_13_2.VERSION) filterCriteriaProvider.rebuildFilter(it)
+                    else it
+                }?.forEach { filter ->
+                    if (filterDao.getByName(filter.title!!) == null) {
+                        filterDao.insert(
+                            filter.copy(
+                                color = themeToColor(context, version, filter.color ?: 0)
+                            )
+                        )
+                    }
                 }
-            }
             backupContainer.caldavAccounts?.forEach { account ->
                 if (caldavDao.getAccountByUuid(account.uuid!!) == null) {
                     caldavDao.insert(account)
@@ -149,9 +174,18 @@ class TasksJsonImporter @Inject constructor(
                             result.skipCount++
                             return@forEach
                         }
-                if (true == backup.caldavTasks
-                                ?.filter { it.deleted == 0L }
-                                ?.any { caldavDao.getTask(it.calendar!!, it.`object`!!) != null }) {
+                if (
+                    backup.caldavTasks
+                        ?.filter { it.deleted == 0L }
+                        ?.any {
+                            val existing = if (it.`object`.isNullOrBlank()) {
+                                caldavDao.getTaskByRemoteId(it.calendar!!, it.remoteId!!)
+                            } else {
+                                caldavDao.getTask(it.calendar!!, it.`object`!!)
+                            }
+                            existing != null
+                        } == true
+                    ) {
                     result.skipCount++
                     return@forEach
                 }
@@ -191,28 +225,30 @@ class TasksJsonImporter @Inject constructor(
                             task = taskId,
                             calendar = googleTask.listId,
                             remoteId = googleTask.remoteId,
-                        ).apply {
-                            remoteOrder = googleTask.remoteOrder
-                            remoteParent = googleTask.remoteParent
-                            lastSync = googleTask.lastSync
-                        }
+                            remoteOrder = googleTask.remoteOrder,
+                            remoteParent = googleTask.remoteParent,
+                            lastSync = googleTask.lastSync,
+                        )
                     )
                 }
                 for (location in backup.locations) {
-                    val place = newPlace()
-                    place.longitude = location.longitude
-                    place.latitude = location.latitude
-                    place.name = location.name
-                    place.address = location.address
-                    place.url = location.url
-                    place.phone = location.phone
+                    val place = Place(
+                        longitude = location.longitude,
+                        latitude = location.latitude,
+                        name = location.name,
+                        address = location.address,
+                        url = location.url,
+                        phone = location.phone,
+                    )
                     locationDao.insert(place)
-                    val geofence = Geofence()
-                    geofence.task = taskId
-                    geofence.place = place.uid
-                    geofence.isArrival = location.arrival
-                    geofence.isDeparture = location.departure
-                    locationDao.insert(geofence)
+                    locationDao.insert(
+                        Geofence(
+                            task = taskId,
+                            place = place.uid,
+                            isArrival = location.arrival,
+                            isDeparture = location.departure,
+                        )
+                    )
                 }
                 for (tag in backup.tags) {
                     val tagData = findTagData(tag) ?: continue
@@ -222,8 +258,9 @@ class TasksJsonImporter @Inject constructor(
                     tagDao.insert(tag)
                 }
                 backup.geofences?.forEach { geofence ->
-                    geofence.task = taskId
-                    locationDao.insert(geofence)
+                    locationDao.insert(
+                        geofence.copy(task = taskId)
+                    )
                 }
                 backup.attachments
                     ?.mapNotNull { taskAttachmentDao.getAttachment(it.attachmentUid) }
@@ -236,8 +273,7 @@ class TasksJsonImporter @Inject constructor(
                     }
                     ?.let { taskAttachmentDao.insert(it) }
                 backup.caldavTasks?.forEach { caldavTask ->
-                    caldavTask.task = taskId
-                    caldavDao.insert(caldavTask)
+                    caldavDao.insert(caldavTask.copy(task = taskId))
                 }
                 backup.vtodo?.let {
                     val caldavTask =

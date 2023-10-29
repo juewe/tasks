@@ -38,9 +38,23 @@ import org.tasks.R
 import org.tasks.Strings
 import org.tasks.analytics.Firebase
 import org.tasks.calendars.CalendarEventProvider
-import org.tasks.data.*
+import org.tasks.data.Alarm
 import org.tasks.data.Alarm.Companion.TYPE_REL_END
 import org.tasks.data.Alarm.Companion.TYPE_REL_START
+import org.tasks.data.AlarmDao
+import org.tasks.data.Attachment
+import org.tasks.data.CaldavDao
+import org.tasks.data.CaldavTask
+import org.tasks.data.GoogleTaskDao
+import org.tasks.data.Location
+import org.tasks.data.LocationDao
+import org.tasks.data.TagDao
+import org.tasks.data.TagData
+import org.tasks.data.TagDataDao
+import org.tasks.data.TaskAttachment
+import org.tasks.data.TaskAttachmentDao
+import org.tasks.data.UserActivity
+import org.tasks.data.UserActivityDao
 import org.tasks.date.DateTimeUtils.toDateTime
 import org.tasks.files.FileHelper
 import org.tasks.location.GeofenceApi
@@ -253,11 +267,6 @@ class TaskEditViewModel @Inject constructor(
             taskDao.createNew(task)
         }
 
-        if (isNew || originalList != selectedList.value) {
-            task.parent = 0
-            taskMover.move(listOf(task.id), selectedList.value)
-        }
-
         if ((isNew && selectedLocation.value != null) || originalLocation != selectedLocation.value) {
             originalLocation?.let { location ->
                 if (location.geofence.id > 0) {
@@ -267,10 +276,12 @@ class TaskEditViewModel @Inject constructor(
             }
             selectedLocation.value?.let { location ->
                 val place = location.place
-                val geofence = location.geofence
-                geofence.task = task.id
-                geofence.place = place.uid
-                geofence.id = locationDao.insert(geofence)
+                locationDao.insert(
+                    location.geofence.copy(
+                        task = task.id,
+                        place = place.uid,
+                    )
+                )
                 geofenceApi.update(place)
             }
             task.putTransitory(SyncFlags.FORCE_CALDAV_SYNC, true)
@@ -280,6 +291,20 @@ class TaskEditViewModel @Inject constructor(
         if ((isNew && selectedTags.value.isNotEmpty()) || originalTags.toHashSet() != selectedTags.value.toHashSet()) {
             tagDao.applyTags(task, tagDataDao, selectedTags.value)
             task.modificationDate = currentTimeMillis()
+        }
+
+        if (!task.hasStartDate()) {
+            selectedAlarms.value = selectedAlarms.value.filterNot { a -> a.type == TYPE_REL_START }
+        }
+        if (!task.hasDueDate()) {
+            selectedAlarms.value = selectedAlarms.value.filterNot { a -> a.type == TYPE_REL_END }
+        }
+
+        taskDao.save(task, null)
+
+        if (isNew || originalList != selectedList.value) {
+            task.parent = 0
+            taskMover.move(listOf(task.id), selectedList.value)
         }
 
         for (subtask in newSubtasks.value) {
@@ -292,19 +317,34 @@ class TaskEditViewModel @Inject constructor(
             taskDao.createNew(subtask)
             alarmDao.insert(subtask.getDefaultAlarms())
             firebase?.addTask("subtasks")
-            when (selectedList.value) {
+            when (val filter = selectedList.value) {
                 is GtasksFilter -> {
-                    val googleTask = CaldavTask(subtask.id, (selectedList.value as GtasksFilter).remoteId, remoteId = null)
+                    val googleTask = CaldavTask(
+                        task = subtask.id,
+                        calendar = filter.remoteId,
+                        remoteId = null,
+                    )
                     subtask.parent = task.id
                     googleTask.isMoved = true
-                    googleTaskDao.insertAndShift(subtask, googleTask, false)
+                    googleTaskDao.insertAndShift(
+                        task = subtask,
+                        caldavTask = googleTask,
+                        top = if (isNew) false else preferences.addTasksToTop()
+                    )
                 }
                 is CaldavFilter -> {
-                    val caldavTask = CaldavTask(subtask.id, (selectedList.value as CaldavFilter).uuid)
+                    val caldavTask = CaldavTask(
+                        task = subtask.id,
+                        calendar = filter.uuid,
+                    )
                     subtask.parent = task.id
                     caldavTask.remoteParent = caldavDao.getRemoteIdForTask(task.id)
                     taskDao.save(subtask)
-                    caldavDao.insert(subtask, caldavTask, false)
+                    caldavDao.insert(
+                        task = subtask,
+                        caldavTask = caldavTask,
+                        addToTop = if (isNew) false else preferences.addTasksToTop()
+                    )
                 }
                 else -> {
                     subtask.parent = task.id
@@ -312,15 +352,6 @@ class TaskEditViewModel @Inject constructor(
                 }
             }
         }
-
-        if (!task.hasStartDate()) {
-            selectedAlarms.value = selectedAlarms.value.filterNot { a -> a.type == TYPE_REL_START }
-        }
-        if (!task.hasDueDate()) {
-            selectedAlarms.value = selectedAlarms.value.filterNot { a -> a.type == TYPE_REL_END }
-        }
-
-        taskDao.save(task, null)
 
         if (
             selectedAlarms.value.toHashSet() != originalAlarms.toHashSet() ||
@@ -361,7 +392,6 @@ class TaskEditViewModel @Inject constructor(
             model.calendarURI?.takeIf { it.isNotBlank() }?.let {
                 taskListEvents.emit(TaskListEvent.CalendarEventCreated(model.title, it))
             }
-            mainActivityEvents.emit(MainActivityEvent.RequestRating)
         }
         true
     }

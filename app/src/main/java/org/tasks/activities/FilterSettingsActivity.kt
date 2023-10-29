@@ -1,12 +1,10 @@
 package org.tasks.activities
 
 import android.app.Activity
-import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
 import android.view.MenuItem
-import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import androidx.core.widget.addTextChangedListener
@@ -24,7 +22,13 @@ import com.todoroo.andlib.sql.UnaryCriterion
 import com.todoroo.andlib.utility.AndroidUtilities
 import com.todoroo.astrid.activity.MainActivity
 import com.todoroo.astrid.activity.TaskListFragment
-import com.todoroo.astrid.api.*
+import com.todoroo.astrid.api.BooleanCriterion
+import com.todoroo.astrid.api.CustomFilter
+import com.todoroo.astrid.api.CustomFilterCriterion
+import com.todoroo.astrid.api.Filter.Companion.NO_ORDER
+import com.todoroo.astrid.api.MultipleSelectCriterion
+import com.todoroo.astrid.api.PermaSql
+import com.todoroo.astrid.api.TextInputCriterion
 import com.todoroo.astrid.core.CriterionInstance
 import com.todoroo.astrid.core.CustomFilterAdapter
 import com.todoroo.astrid.core.CustomFilterItemTouchHelper
@@ -39,9 +43,12 @@ import org.tasks.data.FilterDao
 import org.tasks.data.TaskDao.TaskCriteria.activeAndVisible
 import org.tasks.databinding.FilterSettingsActivityBinding
 import org.tasks.db.QueryUtils
+import org.tasks.extensions.Context.hideKeyboard
 import org.tasks.extensions.Context.openUri
+import org.tasks.extensions.hideKeyboard
 import org.tasks.filters.FilterCriteriaProvider
-import java.util.*
+import org.tasks.themes.CustomIcons
+import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.max
 
@@ -60,6 +67,7 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
     private var filter: CustomFilter? = null
     private lateinit var adapter: CustomFilterAdapter
     private var criteria: MutableList<CriterionInstance> = ArrayList()
+    override val defaultIcon: Int = CustomIcons.FILTER
 
     override fun onCreate(savedInstanceState: Bundle?) {
         filter = intent.getParcelableExtra(TOKEN_FILTER)
@@ -67,21 +75,24 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
         if (savedInstanceState == null && filter != null) {
             selectedColor = filter!!.tint
             selectedIcon = filter!!.icon
-            name.setText(filter!!.listingTitle)
+            name.setText(filter!!.title)
         }
         when {
             savedInstanceState != null -> lifecycleScope.launch {
-                setCriteria(CriterionInstance.fromString(
-                        filterCriteriaProvider, savedInstanceState.getString(EXTRA_CRITERIA)!!))
+                setCriteria(
+                    filterCriteriaProvider.fromString(
+                        savedInstanceState.getString(EXTRA_CRITERIA)!!
+                    )
+                )
             }
             filter != null -> lifecycleScope.launch {
-                setCriteria(CriterionInstance.fromString(
-                        filterCriteriaProvider, filter!!.criterion))
+                setCriteria(filterCriteriaProvider.fromString(filter!!.criterion))
             }
             intent.hasExtra(EXTRA_CRITERIA) -> lifecycleScope.launch {
                 name.setText(intent.getStringExtra(EXTRA_TITLE))
-                setCriteria(CriterionInstance.fromString(
-                        filterCriteriaProvider, intent.getStringExtra(EXTRA_CRITERIA)!!))
+                setCriteria(
+                    filterCriteriaProvider.fromString(intent.getStringExtra(EXTRA_CRITERIA)!!)
+                )
             }
             else -> setCriteria(universe())
         }
@@ -154,7 +165,7 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
         }
 
     private fun addCriteria() {
-        AndroidUtilities.hideKeyboard(this)
+        hideKeyboard()
         fab.shrink()
         lifecycleScope.launch {
             val all = filterCriteriaProvider.all()
@@ -218,7 +229,7 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
         get() = filter == null
 
     override val toolbarTitle: String?
-        get() = if (isNew) getString(R.string.FLA_new_filter) else filter!!.listingTitle
+        get() = if (isNew) getString(R.string.FLA_new_filter) else filter!!.title
 
     override suspend fun save() {
         val newName = newName
@@ -227,24 +238,25 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
             return
         }
         if (hasChanges()) {
-            val f = Filter()
-            f.title = newName
-            f.setColor(selectedColor)
-            f.setIcon(selectedIcon)
-            f.values = AndroidUtilities.mapToSerializedString(values)
-            f.criterion = CriterionInstance.serialize(criteria)
+            var f = Filter(
+                id = filter?.id ?: 0L,
+                title = newName,
+                color = selectedColor,
+                icon = selectedIcon,
+                values = criteria.values,
+                criterion = CriterionInstance.serialize(criteria),
+                sql = criteria.sql,
+                order = filter?.order ?: NO_ORDER,
+            )
             if (f.criterion.isNullOrBlank()) {
                 throw RuntimeException("Criterion cannot be empty")
             }
-            f.setSql(sql)
             if (isNew) {
-                f.id = filterDao.insert(f)
+                f = f.copy(
+                    id = filterDao.insert(f)
+                )
             } else {
-                filter?.let {
-                    f.id = it.id
-                    f.order = it.order
-                    filterDao.update(f)
-                }
+                filterDao.update(f)
             }
             setResult(
                     Activity.RESULT_OK,
@@ -261,17 +273,16 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
         return if (isNew) {
             (!Strings.isNullOrEmpty(newName)
                     || selectedColor != 0 || selectedIcon != -1 || criteria.size > 1)
-        } else newName != filter!!.listingTitle
+        } else newName != filter!!.title
                 || selectedColor != filter!!.tint
                 || selectedIcon != filter!!.icon
-                || CriterionInstance.serialize(criteria) != filter!!.criterion.trim()
-                || values != filter!!.valuesForNewTasks
-                || sql != filter!!.originalSqlQuery
+                || CriterionInstance.serialize(criteria) != filter!!.criterion!!.trim()
+                || criteria.values != filter!!.valuesForNewTasks
+                || criteria.sql != filter!!.sql
     }
 
     override fun finish() {
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.hideSoftInputFromWindow(name.windowToken, 0)
+        hideKeyboard(name)
         super.finish()
     }
 
@@ -312,10 +323,6 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
         val sql = StringBuilder(Query.select(Field.COUNT).from(Task.TABLE).toString())
                 .append(" WHERE ")
         for (instance in criteria) {
-            var value = instance.valueFromCriterion
-            if (value == null && instance.criterion.sql != null && instance.criterion.sql.contains("?")) {
-                value = ""
-            }
             when (instance.type) {
                 CriterionInstance.TYPE_ADD -> sql.append("OR ")
                 CriterionInstance.TYPE_SUBTRACT -> sql.append("AND NOT ")
@@ -326,7 +333,10 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
             if (instance.type == CriterionInstance.TYPE_UNIVERSE || instance.criterion.sql == null) {
                 sql.append(activeAndVisible()).append(' ')
             } else {
-                var subSql: String? = instance.criterion.sql.replace("?", UnaryCriterion.sanitize(value!!))
+                var subSql: String? = instance.criterion.sql.replace(
+                    "?",
+                    UnaryCriterion.sanitize(instance.valueFromCriterion!!)
+                )
                 subSql = PermaSql.replacePlaceholdersForQuery(subSql)
                 sql.append(Task.ID).append(" IN (").append(subSql).append(")")
             }
@@ -345,57 +355,48 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
         adapter.submitList(criteria)
     }
 
-    private fun getValue(instance: CriterionInstance): String? {
-        var value = instance.valueFromCriterion
-        if (value == null && instance.criterion.sql != null && instance.criterion.sql.contains("?")) {
-            value = ""
-        }
-        return value
-    }
-
-    // special code for all tasks universe
-    private val sql: String
-        get() {
-            val sql = StringBuilder(" WHERE ")
-            for (instance in criteria) {
-                val value = getValue(instance)
-                when (instance.type) {
-                    CriterionInstance.TYPE_ADD -> sql.append(" OR ")
-                    CriterionInstance.TYPE_SUBTRACT -> sql.append(" AND NOT ")
-                    CriterionInstance.TYPE_INTERSECT -> sql.append(" AND ")
-                }
-
-                // special code for all tasks universe
-                if (instance.type == CriterionInstance.TYPE_UNIVERSE || instance.criterion.sql == null) {
-                    sql.append(activeAndVisible())
-                } else {
-                    val subSql = instance.criterion.sql
-                            .replace("?", UnaryCriterion.sanitize(value!!))
-                            .trim()
-                    sql.append(Task.ID).append(" IN (").append(subSql).append(")")
-                }
-            }
-            return sql.toString()
-        }
-
-    private val values: Map<String, Any>
-        get() {
-            val values: MutableMap<String, Any> = HashMap()
-            for (instance in criteria) {
-                val value = getValue(instance)
-                if (instance.criterion.valuesForNewTasks != null
-                        && instance.type == CriterionInstance.TYPE_INTERSECT) {
-                    for ((key, value1) in instance.criterion.valuesForNewTasks) {
-                        values[key.replace("?", value!!)] = value1.toString().replace("?", value)
-                    }
-                }
-            }
-            return values
-        }
-
     companion object {
         const val TOKEN_FILTER = "token_filter"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_CRITERIA = "extra_criteria"
+
+        val List<CriterionInstance>.sql: String
+            get() {
+                val sql = StringBuilder(" WHERE ")
+                for (instance in this) {
+                    val value = instance.valueFromCriterion
+                    when (instance.type) {
+                        CriterionInstance.TYPE_ADD -> sql.append(" OR ")
+                        CriterionInstance.TYPE_SUBTRACT -> sql.append(" AND NOT ")
+                        CriterionInstance.TYPE_INTERSECT -> sql.append(" AND ")
+                    }
+
+                    // special code for all tasks universe
+                    if (instance.type == CriterionInstance.TYPE_UNIVERSE || instance.criterion.sql == null) {
+                        sql.append(activeAndVisible())
+                    } else {
+                        val subSql = instance.criterion.sql
+                            .replace("?", UnaryCriterion.sanitize(value!!))
+                            .trim()
+                        sql.append(Task.ID).append(" IN (").append(subSql).append(")")
+                    }
+                }
+                return sql.toString()
+            }
+
+        private val List<CriterionInstance>.values: String
+            get() {
+                val values: MutableMap<String, Any> = HashMap()
+                for (instance in this) {
+                    val value = instance.valueFromCriterion
+                    if (instance.criterion.valuesForNewTasks != null
+                        && instance.type == CriterionInstance.TYPE_INTERSECT) {
+                        for ((key, value1) in instance.criterion.valuesForNewTasks) {
+                            values[key.replace("?", value!!)] = value1.toString().replace("?", value)
+                        }
+                    }
+                }
+                return AndroidUtilities.mapToSerializedString(values)
+            }
     }
 }

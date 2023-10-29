@@ -3,6 +3,7 @@ package com.todoroo.astrid.adapter
 import com.natpryce.makeiteasy.MakeItEasy.with
 import com.natpryce.makeiteasy.PropertyValue
 import com.todoroo.astrid.dao.TaskDao
+import com.todoroo.astrid.service.TaskMover
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.UninstallModules
 import kotlinx.coroutines.runBlocking
@@ -24,6 +25,7 @@ class CaldavTaskAdapterTest : InjectingTestCase() {
     @Inject lateinit var caldavDao: CaldavDao
     @Inject lateinit var googleTaskDao: GoogleTaskDao
     @Inject lateinit var localBroadcastManager: LocalBroadcastManager
+    @Inject lateinit var taskMover: TaskMover
 
     private lateinit var adapter: TaskAdapter
     private val tasks = ArrayList<TaskContainer>()
@@ -33,7 +35,7 @@ class CaldavTaskAdapterTest : InjectingTestCase() {
         super.setUp()
 
         tasks.clear()
-        adapter = TaskAdapter(false, googleTaskDao, caldavDao, taskDao, localBroadcastManager)
+        adapter = TaskAdapter(false, googleTaskDao, caldavDao, taskDao, localBroadcastManager, taskMover)
         adapter.setDataSource(object : TaskAdapterDataSource {
             override fun getItem(position: Int) = tasks[position]
 
@@ -194,14 +196,18 @@ class CaldavTaskAdapterTest : InjectingTestCase() {
 
     private fun addTask(vararg properties: PropertyValue<in TaskContainer?, *>) = runBlocking {
         val t = newTaskContainer(*properties)
-        tasks.add(t)
         val task = t.task
         taskDao.createNew(task)
-        val caldavTask = CaldavTask(t.id, "calendar")
+        val caldavTask = CaldavTask(task = t.id, calendar = "calendar")
         if (task.parent > 0) {
             caldavTask.remoteParent = caldavDao.getRemoteIdForTask(task.parent)
         }
-        caldavTask.id = caldavDao.insert(caldavTask)
-        t.caldavTask = caldavTask
+        tasks.add(
+            t.copy(
+                caldavTask = caldavTask.copy(
+                    id = caldavDao.insert(caldavTask)
+                )
+            )
+        )
     }
 }

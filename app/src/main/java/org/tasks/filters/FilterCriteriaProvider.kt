@@ -8,12 +8,29 @@ import com.todoroo.andlib.sql.Field.Companion.field
 import com.todoroo.andlib.sql.Join.Companion.inner
 import com.todoroo.andlib.sql.Query.Companion.select
 import com.todoroo.andlib.sql.UnaryCriterion.Companion.isNotNull
-import com.todoroo.astrid.api.*
+import com.todoroo.andlib.utility.AndroidUtilities
+import com.todoroo.astrid.api.BooleanCriterion
+import com.todoroo.astrid.api.CustomFilterCriterion
+import com.todoroo.astrid.api.MultipleSelectCriterion
+import com.todoroo.astrid.api.PermaSql
+import com.todoroo.astrid.api.TextInputCriterion
+import com.todoroo.astrid.core.CriterionInstance
 import com.todoroo.astrid.data.Task
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tasks.R
-import org.tasks.data.*
+import org.tasks.Strings
+import org.tasks.activities.FilterSettingsActivity.Companion.sql
+import org.tasks.data.Alarm
+import org.tasks.data.CaldavDao
+import org.tasks.data.CaldavTask
+import org.tasks.data.Filter
+import org.tasks.data.GoogleTask
+import org.tasks.data.GoogleTaskListDao
+import org.tasks.data.Tag
+import org.tasks.data.TagData
+import org.tasks.data.TagDataDao
 import org.tasks.data.TaskDao.TaskCriteria.activeAndVisible
+import timber.log.Timber
 import javax.inject.Inject
 
 class FilterCriteriaProvider @Inject constructor(
@@ -23,7 +40,49 @@ class FilterCriteriaProvider @Inject constructor(
         private val caldavDao: CaldavDao) {
     private val r = context.resources
 
-    suspend fun getFilterCriteria(identifier: String): CustomFilterCriterion = when (identifier) {
+    suspend fun rebuildFilter(filter: Filter): Filter {
+        val serialized = filter.criterion?.takeIf { it.isNotBlank() }
+        val criterion = fromString(serialized)
+        return filter.copy(
+            sql = criterion.sql,
+            criterion = CriterionInstance.serialize(criterion),
+        )
+    }
+
+    suspend fun fromString(criterion: String?): List<CriterionInstance> {
+        if (criterion.isNullOrBlank()) {
+            return emptyList()
+        }
+        val entries: MutableList<CriterionInstance> = java.util.ArrayList()
+        for (row in criterion.trim().split("\n")) {
+            val split = row
+                .split(AndroidUtilities.SERIALIZATION_SEPARATOR)
+                .map { unescape(it) }
+            if (split.size != 4 && split.size != 5) {
+                Timber.e("invalid row: %s", row)
+                return emptyList()
+            }
+            val entry = CriterionInstance()
+            entry.criterion = getFilterCriteria(split[0])
+            val value = split[1]
+            if (entry.criterion is TextInputCriterion) {
+                entry.selectedText = value
+            } else if (entry.criterion is MultipleSelectCriterion) {
+                val multipleSelectCriterion = entry.criterion as MultipleSelectCriterion?
+                if (multipleSelectCriterion!!.entryValues != null) {
+                    entry.selectedIndex = multipleSelectCriterion.entryValues.indexOf(value)
+                }
+            } else {
+                Timber.d("Ignored value %s for %s", value, entry.criterion)
+            }
+            entry.type = split[3].toInt()
+            Timber.d("%s -> %s", row, entry)
+            entries.add(entry)
+        }
+        return entries
+    }
+
+    private suspend fun getFilterCriteria(identifier: String): CustomFilterCriterion = when (identifier) {
         IDENTIFIER_UNIVERSE -> startingUniverse
         IDENTIFIER_TITLE -> taskTitleContainsFilter
         IDENTIFIER_IMPORTANCE -> priorityFilter
@@ -202,8 +261,8 @@ class FilterCriteriaProvider @Inject constructor(
                                             // EOD today if the specified date is NOW
                                             or(Task.DUE_DATE.lte("?"),
                                                 and(field("${Task.DUE_DATE} / 1000 % 60").eq(0),
-                                                    field("?").eq(field("${PermaSql.VALUE_NOW}")),
-                                                    Task.DUE_DATE.lte("${PermaSql.VALUE_EOD}")))))
+                                                    field("?").eq(field(PermaSql.VALUE_NOW)),
+                                                    Task.DUE_DATE.lte(PermaSql.VALUE_EOD)))))
                             .toString(),
                     values,
                     r.getStringArray(R.array.CFC_dueBefore_entries),
@@ -350,5 +409,12 @@ class FilterCriteriaProvider @Inject constructor(
         private const val IDENTIFIER_REMINDERS = "reminders"
 
         private val ONE = field("1")
+
+        private fun unescape(item: String?): String {
+            return if (Strings.isNullOrEmpty(item)) {
+                ""
+            } else item!!.replace(
+                AndroidUtilities.SEPARATOR_ESCAPE, AndroidUtilities.SERIALIZATION_SEPARATOR)
+        }
     }
 }

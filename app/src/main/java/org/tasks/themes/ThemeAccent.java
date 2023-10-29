@@ -53,7 +53,7 @@ public class ThemeAccent implements Pickable {
       };
 
   public static final Parcelable.Creator<ThemeAccent> CREATOR =
-      new Parcelable.Creator<ThemeAccent>() {
+      new Parcelable.Creator<>() {
         @Override
         public ThemeAccent createFromParcel(Parcel source) {
           return new ThemeAccent(source);
@@ -70,7 +70,7 @@ public class ThemeAccent implements Pickable {
   public ThemeAccent(Context context, int style) {
     this.style = style;
     Resources.Theme theme = new ContextThemeWrapper(context, style).getTheme();
-    this.accentColor = resolveAttribute(theme, R.attr.colorSecondary);
+    this.accentColor = resolveAttribute(theme, com.google.android.material.R.attr.colorSecondary);
   }
 
   private ThemeAccent(Parcel source) {
@@ -95,15 +95,10 @@ public class ThemeAccent implements Pickable {
 
   @Override
   public boolean isFree() {
-    switch (style) {
-      case R.style.BlueGreyAccent:
-      case R.style.RedAccent:
-      case R.style.BlueGreyAccentDesaturated:
-      case R.style.RedAccentDesaturated:
-        return true;
-      default:
-        return false;
-    }
+    return style == R.style.BlueGreyAccent ||
+            style == R.style.RedAccent ||
+            style == R.style.BlueGreyAccentDesaturated ||
+            style == R.style.RedAccentDesaturated;
   }
 
   @Deprecated

@@ -7,7 +7,7 @@ import android.widget.ListAdapter
 import androidx.appcompat.app.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
-import com.google.accompanist.themeadapter.appcompat.AppCompatTheme
+import com.google.android.material.composethemeadapter.MdcTheme
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class AlertDialogBuilder internal constructor(private val context: Context) {
@@ -63,13 +63,6 @@ class AlertDialogBuilder internal constructor(private val context: Context) {
         return this
     }
 
-    fun setAdapter(
-        adapter: ListAdapter?, onClickListener: DialogInterface.OnClickListener?
-    ): AlertDialogBuilder {
-        builder.setAdapter(adapter, onClickListener)
-        return this
-    }
-
     fun setView(dialogView: View?): AlertDialogBuilder {
         builder.setView(dialogView)
         return this
@@ -79,7 +72,7 @@ class AlertDialogBuilder internal constructor(private val context: Context) {
         builder.setView(ComposeView(context)
             .apply {
                 setContent {
-                    AppCompatTheme {
+                    MdcTheme {
                         content()
                     }
                 }
@@ -124,13 +117,6 @@ class AlertDialogBuilder internal constructor(private val context: Context) {
 
     fun setTitle(title: String?): AlertDialogBuilder {
         builder.setTitle(title)
-        return this
-    }
-
-    fun setOnDismissListener(
-        onDismissListener: DialogInterface.OnDismissListener?
-    ): AlertDialogBuilder {
-        builder.setOnDismissListener(onDismissListener)
         return this
     }
 

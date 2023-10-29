@@ -8,7 +8,7 @@ import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
-import com.google.accompanist.themeadapter.appcompat.AppCompatTheme
+import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.andlib.utility.DateUtilities.getTimeString
 import dagger.hilt.android.AndroidEntryPoint
@@ -48,7 +48,7 @@ class StartDateControlSet : TaskEditControlFragment() {
     override fun bind(parent: ViewGroup?) =
         (parent as ComposeView).apply {
             setContent {
-                AppCompatTheme {
+                MdcTheme {
                     val selectedDay = vm.selectedDay.collectAsStateLifecycleAware().value
                     val selectedTime = vm.selectedTime.collectAsStateLifecycleAware().value
                     StartDateRow(
@@ -109,7 +109,7 @@ class StartDateControlSet : TaskEditControlFragment() {
     }
 
     companion object {
-        const val TAG = R.string.TEA_ctrl_hide_until_pref
+        val TAG = R.string.TEA_ctrl_hide_until_pref
         private const val REQUEST_START_DATE = 11011
         private const val FRAG_TAG_DATE_PICKER = "frag_tag_date_picker"
 

@@ -11,9 +11,9 @@ internal class DiffCallback(
         @Deprecated("") private val adapter: TaskAdapter
 ) : DiffUtil.Callback() {
 
-    private val refreshDates = when (old.sortMode) {
-        SORT_DUE -> new.sortMode == SORT_START
-        SORT_START -> new.sortMode == SORT_DUE
+    private val refreshDates = when (old.groupMode) {
+        SORT_DUE -> new.groupMode == SORT_START
+        SORT_START -> new.groupMode == SORT_DUE
         else -> false
     }
 
@@ -28,7 +28,7 @@ internal class DiffCallback(
             return false
         }
         return if (isHeader) {
-            old.sortMode == new.sortMode && old.getHeaderValue(oldPosition) == new.getHeaderValue(newPosition)
+            old.groupMode == new.groupMode && old.getHeaderValue(oldPosition) == new.getHeaderValue(newPosition)
         } else {
             old.getItem(oldPosition)!!.id == new.getItem(newPosition)!!.id
         }
@@ -40,6 +40,6 @@ internal class DiffCallback(
         }
         val oldItem = old.getItem(oldPosition)!!
         val newItem = new.getItem(newPosition)!!
-        return !refreshDates && oldItem == newItem && oldItem.getIndent() == adapter.getIndent(newItem)
+        return !refreshDates && oldItem == newItem && oldItem.indent == adapter.getIndent(newItem)
     }
 }

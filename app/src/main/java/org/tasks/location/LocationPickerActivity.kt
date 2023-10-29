@@ -8,6 +8,7 @@ import android.os.Parcelable
 import android.view.MenuItem
 import android.view.View
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.coordinatorlayout.widget.CoordinatorLayout
@@ -18,9 +19,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.AppBarLayout.Behavior.DragCallback
-import com.google.android.material.appbar.AppBarLayout.OnOffsetChangedListener
 import com.google.android.material.appbar.CollapsingToolbarLayout
-import com.todoroo.andlib.utility.AndroidUtilities
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,13 +34,12 @@ import org.tasks.billing.Inventory
 import org.tasks.caldav.GeoUtils.toLikeString
 import org.tasks.data.LocationDao
 import org.tasks.data.Place
-import org.tasks.data.Place.Companion.newPlace
 import org.tasks.data.PlaceUsage
 import org.tasks.databinding.ActivityLocationPickerBinding
 import org.tasks.dialogs.DialogBuilder
 import org.tasks.extensions.Context.toast
+import org.tasks.extensions.hideKeyboard
 import org.tasks.extensions.setOnQueryTextListener
-import org.tasks.injection.InjectingAppCompatActivity
 import org.tasks.location.LocationPickerAdapter.OnLocationPicked
 import org.tasks.location.LocationSearchAdapter.OnPredictionPicked
 import org.tasks.location.MapFragment.MapFragmentCallback
@@ -56,7 +54,7 @@ import javax.inject.Inject
 import kotlin.math.abs
 
 @AndroidEntryPoint
-class LocationPickerActivity : InjectingAppCompatActivity(), Toolbar.OnMenuItemClickListener, MapFragmentCallback, OnLocationPicked, SearchView.OnQueryTextListener, OnPredictionPicked, MenuItem.OnActionExpandListener {
+class LocationPickerActivity : AppCompatActivity(), Toolbar.OnMenuItemClickListener, MapFragmentCallback, OnLocationPicked, SearchView.OnQueryTextListener, OnPredictionPicked, MenuItem.OnActionExpandListener {
     private lateinit var toolbar: Toolbar
     private lateinit var appBarLayout: AppBarLayout
     private lateinit var toolbarLayout: CollapsingToolbarLayout
@@ -138,15 +136,14 @@ class LocationPickerActivity : InjectingAppCompatActivity(), Toolbar.OnMenuItemC
                     }
                 })
         params.behavior = behavior
-        appBarLayout.addOnOffsetChangedListener(
-                OnOffsetChangedListener { appBarLayout: AppBarLayout, offset: Int ->
-                    if (offset == 0 && this.offset != 0) {
-                        closeSearch()
-                        AndroidUtilities.hideKeyboard(this)
-                    }
-                    this.offset = offset
-                    toolbar.alpha = abs(offset / appBarLayout.totalScrollRange.toFloat())
-                })
+        appBarLayout.addOnOffsetChangedListener { appBarLayout: AppBarLayout, offset: Int ->
+            if (offset == 0 && this.offset != 0) {
+                closeSearch()
+                hideKeyboard()
+            }
+            this.offset = offset
+            toolbar.alpha = abs(offset / appBarLayout.totalScrollRange.toFloat())
+        }
         coordinatorLayout.addOnLayoutChangeListener(
                 object : View.OnLayoutChangeListener {
                     override fun onLayoutChange(
@@ -231,7 +228,13 @@ class LocationPickerActivity : InjectingAppCompatActivity(), Toolbar.OnMenuItemC
         loadingIndicator.visibility = View.VISIBLE
         lifecycleScope.launch {
             try {
-                returnPlace(geocoder.reverseGeocode(mapPosition) ?: newPlace(mapPosition))
+                returnPlace(
+                    geocoder.reverseGeocode(mapPosition)
+                        ?: Place(
+                            latitude = mapPosition.latitude,
+                            longitude = mapPosition.longitude,
+                        )
+                )
             } catch (e: Exception) {
                 loadingIndicator.visibility = View.GONE
                 firebase.reportException(e)
@@ -264,18 +267,16 @@ class LocationPickerActivity : InjectingAppCompatActivity(), Toolbar.OnMenuItemC
             Timber.e("Place is null")
             return
         }
-        AndroidUtilities.hideKeyboard(this)
+        hideKeyboard()
         lifecycleScope.launch {
             var place = place
             if (place.id <= 0) {
-                val existing = locationDao.findPlace(
+                place = locationDao
+                    .findPlace(
                         place.latitude.toLikeString(),
-                        place.longitude.toLikeString())
-                if (existing == null) {
-                    place.id = locationDao.insert(place)
-                } else {
-                    place = existing
-                }
+                        place.longitude.toLikeString()
+                    )
+                    ?: place.copy(id = locationDao.insert(place))
             }
             setResult(Activity.RESULT_OK, Intent().putExtra(EXTRA_PLACE, place as Parcelable?))
             finish()

@@ -1,10 +1,15 @@
 package com.todoroo.astrid.service
 
 import com.todoroo.astrid.api.Filter
+import com.todoroo.astrid.api.FilterImpl
 import com.todoroo.astrid.data.Task
 import org.tasks.LocalBroadcastManager
 import org.tasks.caldav.VtodoCache
-import org.tasks.data.*
+import org.tasks.data.CaldavAccount
+import org.tasks.data.CaldavCalendar
+import org.tasks.data.DeletionDao
+import org.tasks.data.TaskContainer
+import org.tasks.data.TaskDao
 import org.tasks.db.QueryUtils
 import org.tasks.db.SuspendDbUtils.chunkedMap
 import org.tasks.jobs.WorkManager
@@ -17,7 +22,6 @@ class TaskDeleter @Inject constructor(
         private val workManager: WorkManager,
         private val taskDao: TaskDao,
         private val localBroadcastManager: LocalBroadcastManager,
-        private val googleTaskDao: GoogleTaskDao,
         private val preferences: Preferences,
         private val syncAdapters: SyncAdapters,
         private val vtodoCache: VtodoCache,
@@ -40,13 +44,13 @@ class TaskDeleter @Inject constructor(
     }
 
     suspend fun clearCompleted(filter: Filter): Int {
-        val deleteFilter = Filter(null, null)
-        deleteFilter.setFilterQueryOverride(
-                QueryUtils.removeOrder(QueryUtils.showHiddenAndCompleted(filter.originalSqlQuery)))
+        val deleteFilter = FilterImpl(
+            sql = QueryUtils.removeOrder(QueryUtils.showHiddenAndCompleted(filter.sql!!)),
+        )
         val completed = taskDao.fetchTasks(preferences, deleteFilter)
                 .filter(TaskContainer::isCompleted)
                 .filterNot(TaskContainer::isReadOnly)
-                .map(TaskContainer::getId)
+                .map(TaskContainer::id)
                 .toMutableList()
         completed.removeAll(deletionDao.hasRecurringAncestors(completed))
         markDeleted(completed)

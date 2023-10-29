@@ -109,7 +109,6 @@ class GoogleTaskSynchronizer @Inject constructor(
             return
         }
         val gtasksInvoker = invokers.getGtasksInvoker(account.username!!)
-        pushLocalChanges(account, gtasksInvoker)
         val gtaskLists: MutableList<TaskList> = ArrayList()
         var nextPageToken: String? = null
         var eTag: String? = null
@@ -130,6 +129,7 @@ class GoogleTaskSynchronizer @Inject constructor(
                 preferences.setString(R.string.p_default_list, null)
             }
         }
+        pushLocalChanges(account, gtasksInvoker)
         for (list in googleTaskListDao.getByRemoteId(gtaskLists.map { it.id })) {
             if (isNullOrEmpty(list.uuid)) {
                 firebase.reportException(RuntimeException("Empty remote id"))
@@ -179,7 +179,16 @@ class GoogleTaskSynchronizer @Inject constructor(
     @Throws(IOException::class)
     private suspend fun pushTask(task: com.todoroo.astrid.data.Task, gtasksInvoker: GtasksInvoker) {
         for (deleted in googleTaskDao.getDeletedByTaskId(task.id)) {
-            gtasksInvoker.deleteGtask(deleted.calendar, deleted.remoteId)
+            deleted.remoteId?.let {
+                try {
+                    gtasksInvoker.deleteGtask(deleted.calendar, it)
+                } catch (e: GoogleJsonResponseException) {
+                    when (e.statusCode) {
+                        400 -> Timber.e(e)
+                        else -> throw e
+                    }
+                }
+            }
             googleTaskDao.delete(deleted)
         }
         val gtasksMetadata = googleTaskDao.getByTaskId(task.id) ?: return
@@ -189,14 +198,13 @@ class GoogleTaskSynchronizer @Inject constructor(
         val defaultRemoteList = defaultFilterProvider.defaultList
         var listId = if (defaultRemoteList is GtasksFilter) defaultRemoteList.remoteId else DEFAULT_LIST
         if (isNullOrEmpty(gtasksMetadata.remoteId)) { // Create case
-            val selectedList = gtasksMetadata.calendar
-            if (!isNullOrEmpty(selectedList)) {
-                listId = selectedList
+            gtasksMetadata.calendar?.takeIf { it.isNotBlank() }?.let {
+                listId = it
             }
             newlyCreated = true
         } else { // update case
             remoteId = gtasksMetadata.remoteId
-            listId = gtasksMetadata.calendar
+            listId = gtasksMetadata.calendar!!
             remoteModel.id = remoteId
         }
 
@@ -302,7 +310,11 @@ class GoogleTaskSynchronizer @Inject constructor(
             var googleTask = googleTaskDao.getByRemoteId(remoteId)
             var task: com.todoroo.astrid.data.Task? = null
             if (googleTask == null) {
-                googleTask = CaldavTask(0, "", remoteId = null)
+                googleTask = CaldavTask(
+                    task = 0,
+                    calendar = "",
+                    remoteId = null,
+                )
             } else if (googleTask.task > 0) {
                 task = taskDao.fetch(googleTask.task)
             }
@@ -364,13 +376,18 @@ class GoogleTaskSynchronizer @Inject constructor(
             alarmDao.insert(task.getDefaultAlarms())
         }
         taskDao.save(task)
-        googleTask.lastSync = task.modificationDate
-        googleTask.task = task.id
-        if (googleTask.id == 0L) {
-            googleTaskDao.insert(googleTask)
-        } else {
-            googleTaskDao.update(googleTask)
-        }
+        googleTask
+            .copy(
+                task = task.id,
+                lastSync = task.modificationDate,
+            )
+            .let {
+                if (it.id == 0L) {
+                    googleTaskDao.insert(it)
+                } else {
+                    googleTaskDao.update(it)
+                }
+            }
     }
 
     companion object {

@@ -75,7 +75,7 @@ class RepeatTaskHelper @Inject constructor(
         val previousDueDate =
                 oldDueDate
                         .takeIf { it > 0 }
-                        ?: newDueDate - (computeNextDueDate(task, recurrence, repeatAfterCompletion) - newDueDate)
+                        ?: (newDueDate - (computeNextDueDate(task, recurrence, repeatAfterCompletion) - newDueDate))
         rescheduleAlarms(task.id, previousDueDate, newDueDate)
         taskCompleter.setComplete(task, false)
         broadcastCompletion(task, previousDueDate)
@@ -154,7 +154,7 @@ class RepeatTaskHelper @Inject constructor(
                 recur: Recur, original: DateTime, hasDueTime: Boolean): Long {
             val byDay = recur.dayList
             var newDate = original.millis
-            newDate += DateUtilities.ONE_WEEK * (recur.interval - 1)
+            newDate += DateUtilities.ONE_WEEK * (recur.interval.coerceAtLeast(1) - 1)
             var date = DateTime(newDate)
             Collections.sort(byDay, weekdayCompare)
             val next = findNextWeekday(byDay, date)
@@ -263,7 +263,7 @@ class RepeatTaskHelper @Inject constructor(
                 else -> throw RuntimeException(
                         "Error handing subday repeat: " + recur.frequency) // $NON-NLS-1$
             }
-            val newDueDate = startDate.millis + millis * recur.interval
+            val newDueDate = startDate.millis + millis * recur.interval.coerceAtLeast(1)
             return createDueDate(Task.URGENCY_SPECIFIC_DAY_TIME, newDueDate)
         }
 

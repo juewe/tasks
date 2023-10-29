@@ -47,7 +47,7 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
-class WorkManagerImpl constructor(
+class WorkManagerImpl(
         private val context: Context,
         private val preferences: Preferences,
         private val caldavDao: CaldavDao,
@@ -91,19 +91,24 @@ class WorkManagerImpl constructor(
         }
     }
 
+    override suspend fun startEnqueuedSync() {
+        if (getSyncJob().any { it.state == WorkInfo.State.ENQUEUED }) {
+            sync(true)
+        }
+    }
+
+    @SuppressLint("EnqueueWork")
     override suspend fun sync(immediate: Boolean) {
-        Timber.d("sync(immediate = $immediate)")
         val builder = OneTimeWorkRequest.Builder(SyncWork::class.java)
                 .setInputData(EXTRA_IMMEDIATE to immediate)
-                .setConstraints(networkConstraints)
+        if (!openTaskDao.shouldSync()) {
+            builder.setConstraints(networkConstraints)
+        }
         if (!immediate) {
             builder.setInitialDelay(1, TimeUnit.MINUTES)
         }
-        val append = withContext(Dispatchers.IO) {
-            workManager.getWorkInfosByTag(TAG_SYNC).get().any {
-                it.state == WorkInfo.State.RUNNING
-            }
-        }
+        val append = getSyncJob().any { it.state == WorkInfo.State.RUNNING }
+        Timber.d("sync: immediate=$immediate, append=$append)")
         enqueue(workManager.beginUniqueWork(
                 TAG_SYNC,
                 if (append) APPEND_OR_REPLACE else REPLACE,
@@ -123,9 +128,7 @@ class WorkManagerImpl constructor(
 
     override fun updateBackgroundSync() {
         throttle.run {
-            val enabled =
-                    caldavDao.getAccounts(TYPE_GOOGLE_TASKS, TYPE_CALDAV, TYPE_TASKS, TYPE_ETEBASE).isNotEmpty() ||
-                    openTaskDao.shouldSync()
+            val enabled = caldavDao.getAccounts(TYPE_GOOGLE_TASKS, TYPE_CALDAV, TYPE_TASKS, TYPE_ETEBASE).isNotEmpty()
             if (enabled) {
                 Timber.d("Enabling background sync")
                 val builder = PeriodicWorkRequest.Builder(SyncWork::class.java, 1, TimeUnit.HOURS)
@@ -256,6 +259,10 @@ class WorkManagerImpl constructor(
                 )
             }
         }
+
+    private suspend fun getSyncJob() = withContext(Dispatchers.IO) {
+        workManager.getWorkInfosForUniqueWork(TAG_SYNC).get()
+    }
 }
 
 private fun <B : WorkRequest.Builder<B, *>, W : WorkRequest> WorkRequest.Builder<B, W>.setInputData(

@@ -4,13 +4,13 @@ import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 
 plugins {
     id("com.android.application")
-    id("checkstyle")
     id("com.google.gms.google-services")
     id("com.google.firebase.crashlytics")
     kotlin("android")
-    kotlin("kapt")
     id("dagger.hilt.android.plugin")
     id("com.google.android.gms.oss-licenses-plugin")
+    id("kotlin-parcelize")
+    id("com.google.devtools.ksp")
 }
 
 repositories {
@@ -41,6 +41,7 @@ android {
         viewBinding = true
         dataBinding = true
         compose = true
+        buildConfig = true
     }
 
     lint {
@@ -49,22 +50,20 @@ android {
         textReport = true
     }
 
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         testApplicationId = "org.tasks.test"
         applicationId = "org.tasks"
-        versionCode = 130200
-        versionName = "13.2"
+        versionCode = 130603
+        versionName = "13.6.1"
         targetSdk = 33
         minSdk = 24
         testInstrumentationRunner = "org.tasks.TestRunner"
 
-        kapt {
-            arguments {
-                arg("room.schemaLocation", "$projectDir/schemas")
-                arg("room.incremental", "true")
-            }
+        ksp {
+            arg("room.schemaLocation", "$projectDir/schemas")
+            arg("room.incremental", "true")
         }
     }
 
@@ -94,6 +93,13 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        val composeReports = project.properties["composeMetrics"] ?: project.buildDir.absolutePath
+        freeCompilerArgs = listOf(
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${composeReports}/compose-metrics",
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${composeReports}/compose-metrics",
+        )
     }
     flavorDimensions += listOf("store")
 
@@ -129,6 +135,7 @@ android {
             dimension = "store"
         }
         create("googleplay") {
+            isDefault = true
             dimension = "store"
         }
     }
@@ -139,11 +146,6 @@ android {
     }
 
     namespace = "org.tasks"
-}
-
-configure<CheckstyleExtension> {
-    configFile = project.file("google_checks.xml")
-    toolVersion = "8.16"
 }
 
 configurations.all {
@@ -163,6 +165,7 @@ dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.bitfire.dav4jvm) {
         exclude(group = "junit")
+        exclude(group = "org.ogce", module = "xpp3")
     }
     implementation(libs.bitfire.ical4android) {
         exclude(group = "commons-logging")
@@ -179,29 +182,37 @@ dependencies {
     implementation(libs.dmfs.jems)
 
     implementation(libs.dagger.hilt)
-    kapt(libs.dagger.hilt.compiler)
-    kapt(libs.androidx.hilt.compiler)
+    ksp(libs.dagger.hilt.compiler)
+    ksp(libs.androidx.hilt.compiler)
     implementation(libs.androidx.hilt.work)
 
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.room)
-    kapt(libs.androidx.room.compiler)
+    ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.paging)
-    implementation(libs.bundles.markwon)
+    implementation(libs.markwon)
+    implementation(libs.markwon.editor)
+    implementation(libs.markwon.linkify)
+    implementation(libs.markwon.strikethrough)
+    implementation(libs.markwon.tables)
+    implementation(libs.markwon.tasklist)
 
-    debugImplementation(libs.bundles.flipper)
+    debugImplementation(libs.facebook.flipper)
+    debugImplementation(libs.facebook.flipper.network)
+    debugImplementation(libs.facebook.soloader)
     debugImplementation(libs.leakcanary)
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation(libs.kotlin.reflect)
 
     implementation(libs.kotlin.jdk8)
+    implementation(libs.kotlin.immutable)
     implementation(libs.okhttp)
     implementation(libs.persistent.cookiejar)
     implementation(libs.gson)
     implementation(libs.material)
+    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.preference)
@@ -222,7 +233,8 @@ dependencies {
     implementation(libs.colorpicker)
     implementation(libs.appauth)
     implementation(libs.osmdroid)
-    implementation(libs.bundles.retrofit)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.moshi)
     implementation(libs.androidx.recyclerview)
 
     implementation(platform(libs.androidx.compose))
@@ -230,16 +242,20 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material")
     implementation("androidx.compose.runtime:runtime-livedata")
+    implementation(libs.compose.theme.adapter)
     implementation(libs.androidx.activity.compose)
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation("androidx.compose.ui:ui-viewbinding")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation(libs.bundles.coil)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.video)
+    implementation(libs.coil.svg)
+    implementation(libs.coil.gif)
 
     implementation(libs.accompanist.flowlayout)
     implementation(libs.accompanist.permissions)
-    implementation(libs.accompanist.themeadapter)
+    implementation(libs.accompanist.systemuicontroller)
 
     googleplayImplementation(platform(libs.firebase))
     googleplayImplementation("com.google.firebase:firebase-crashlytics")
@@ -255,8 +271,8 @@ dependencies {
     googleplayImplementation(libs.play.services.oss.licenses)
 
     androidTestImplementation(libs.dagger.hilt.testing)
-    kaptAndroidTest(libs.dagger.hilt.compiler)
-    kaptAndroidTest(libs.androidx.hilt.compiler)
+    kspAndroidTest(libs.dagger.hilt.compiler)
+    kspAndroidTest(libs.androidx.hilt.compiler)
     androidTestImplementation(libs.mockito.android)
     androidTestImplementation(libs.make.it.easy)
     androidTestImplementation(libs.androidx.test.runner)

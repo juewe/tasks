@@ -3,24 +3,14 @@ package org.tasks.compose.edit
 import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ContentAlpha
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -33,16 +23,11 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.google.accompanist.themeadapter.appcompat.AppCompatTheme
+import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.astrid.api.Filter
 import com.todoroo.astrid.api.GtasksFilter
 import com.todoroo.astrid.data.Task
-import org.tasks.compose.CheckBox
-import org.tasks.compose.ClearButton
-import org.tasks.compose.DisabledText
-import org.tasks.compose.SubtaskChip
-import org.tasks.compose.TaskEditIcon
-import org.tasks.compose.TaskEditRow
+import org.tasks.compose.*
 import org.tasks.data.TaskContainer
 
 @Composable
@@ -198,7 +183,7 @@ fun ExistingSubtaskRow(
             modifier = Modifier.align(Alignment.Top),
         )
         Text(
-            text = task.title,
+            text = task.title!!,
             modifier = Modifier
                 .weight(1f)
                 .alpha(if (task.isCompleted || task.isHidden) ContentAlpha.disabled else ContentAlpha.high)
@@ -223,7 +208,7 @@ fun ExistingSubtaskRow(
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, widthDp = 320)
 @Composable
 fun NoSubtasks() {
-    AppCompatTheme {
+    MdcTheme {
         SubtaskRow(
             originalFilter = null,
             filter = null,
@@ -245,27 +230,27 @@ fun NoSubtasks() {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, widthDp = 320)
 @Composable
 fun SubtasksPreview() {
-    AppCompatTheme {
+    MdcTheme {
         SubtaskRow(
             originalFilter = null,
             filter = null,
             hasParent = false,
             desaturate = true,
             existingSubtasks = listOf(
-                TaskContainer().apply {
+                TaskContainer(
                     task = Task().apply {
                         title = "Existing subtask 1"
                         priority = Task.Priority.HIGH
-                    }
+                    },
                     indent = 0
-                },
-                TaskContainer().apply {
+                ),
+                TaskContainer(
                     task = Task().apply {
                         title = "Existing subtask 2 with a really long title"
                         priority = Task.Priority.LOW
-                    }
+                    },
                     indent = 1
-                }
+                )
             ),
             newSubtasks = listOf(
                 Task().apply {

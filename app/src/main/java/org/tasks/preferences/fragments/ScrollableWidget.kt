@@ -5,9 +5,20 @@ import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
-import androidx.preference.*
+import androidx.preference.ListPreference
+import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
+import androidx.preference.SeekBarPreference
+import androidx.preference.SwitchPreferenceCompat
+import com.todoroo.astrid.api.AstridOrderingFilter
 import com.todoroo.astrid.api.Filter
-import com.todoroo.astrid.core.SortHelper.*
+import com.todoroo.astrid.core.SortHelper.SORT_ALPHA
+import com.todoroo.astrid.core.SortHelper.SORT_CREATED
+import com.todoroo.astrid.core.SortHelper.SORT_DUE
+import com.todoroo.astrid.core.SortHelper.SORT_IMPORTANCE
+import com.todoroo.astrid.core.SortHelper.SORT_LIST
+import com.todoroo.astrid.core.SortHelper.SORT_MODIFIED
+import com.todoroo.astrid.core.SortHelper.SORT_START
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.tasks.LocalBroadcastManager
@@ -18,7 +29,7 @@ import org.tasks.dialogs.ColorPickerAdapter.Palette
 import org.tasks.dialogs.ColorWheelPicker
 import org.tasks.dialogs.FilterPicker.Companion.newFilterPicker
 import org.tasks.dialogs.FilterPicker.Companion.setFilterPickerResultListener
-import org.tasks.dialogs.SortDialog.newSortDialog
+import org.tasks.dialogs.SortSettingsActivity
 import org.tasks.dialogs.ThemePickerDialog.Companion.newThemePickerDialog
 import org.tasks.injection.InjectingPreferenceFragment
 import org.tasks.preferences.DefaultFilterProvider
@@ -37,7 +48,6 @@ class ScrollableWidget : InjectingPreferenceFragment() {
 
         const val EXTRA_WIDGET_ID = "extra_widget_id"
         private const val FRAG_TAG_COLOR_PICKER = "frag_tag_color_picker"
-        private const val FRAG_TAG_SORT_DIALOG = "frag_tag_sort_dialog"
         private const val FRAG_TAG_FILTER_PICKER = "frag_tag_filter_picker"
 
         fun newScrollableWidget(appWidgetId: Int): ScrollableWidget {
@@ -64,6 +74,12 @@ class ScrollableWidget : InjectingPreferenceFragment() {
             widgetPreferences.setFilter(defaultFilterProvider.getFilterPreferenceValue(it))
             updateFilter()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        updateSort()
     }
 
     override suspend fun setupPreferences(savedInstanceState: Bundle?) {
@@ -95,8 +111,7 @@ class ScrollableWidget : InjectingPreferenceFragment() {
         setupCheckbox(R.string.p_widget_show_lists)
         setupCheckbox(R.string.p_widget_show_tags)
         setupCheckbox(R.string.p_widget_show_full_task_title, false)
-        setupCheckbox(R.string.p_widget_disable_groups, false)
-        setupCheckbox(R.string.p_widget_show_hidden, false)
+        setupCheckbox(R.string.p_widget_show_hidden, true)
         setupCheckbox(R.string.p_widget_show_completed, false)
         val showDescription = setupCheckbox(R.string.p_widget_show_description, true)
         setupCheckbox(R.string.p_widget_show_full_description, false).dependency = showDescription.key
@@ -116,8 +131,16 @@ class ScrollableWidget : InjectingPreferenceFragment() {
 
         findPreference(R.string.p_widget_sort).setOnPreferenceClickListener {
             lifecycleScope.launch {
-                newSortDialog(this@ScrollableWidget, REQUEST_SORT, getFilter(), appWidgetId)
-                        .show(parentFragmentManager, FRAG_TAG_SORT_DIALOG)
+                val filter = getFilter()
+                requireActivity().startActivityForResult(
+                    SortSettingsActivity.getIntent(
+                        requireActivity(),
+                        filter.supportsManualSort(),
+                        filter is AstridOrderingFilter,
+                        appWidgetId,
+                    ),
+                    REQUEST_SORT
+                )
             }
             false
         }
@@ -190,7 +213,7 @@ class ScrollableWidget : InjectingPreferenceFragment() {
     }
 
     private fun updateFilter() = lifecycleScope.launch {
-        findPreference(R.string.p_widget_filter).summary = getFilter().listingTitle
+        findPreference(R.string.p_widget_filter).summary = getFilter().title
         updateSort()
     }
 
@@ -199,7 +222,7 @@ class ScrollableWidget : InjectingPreferenceFragment() {
         findPreference(R.string.p_widget_sort).setSummary(
                 if (filter.supportsManualSort() && widgetPreferences.isManualSort) {
                     R.string.SSD_sort_my_order
-                } else if (filter.supportsAstridSorting() && widgetPreferences.isAstridSort) {
+                } else if (filter is AstridOrderingFilter && widgetPreferences.isAstridSort) {
                     R.string.astrid_sort_order
                 } else {
                     when (widgetPreferences.sortMode) {
@@ -209,6 +232,7 @@ class ScrollableWidget : InjectingPreferenceFragment() {
                         SORT_ALPHA -> R.string.SSD_sort_alpha
                         SORT_MODIFIED -> R.string.SSD_sort_modified
                         SORT_CREATED -> R.string.sort_created
+                        SORT_LIST -> R.string.sort_list
                         else -> R.string.SSD_sort_auto
                     }
                 })

@@ -30,7 +30,8 @@
   <!-- ************* -->
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+  <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
   <!-- *************************** -->
   <!-- google calendar integration -->
@@ -71,9 +72,9 @@
   <!-- ****************************** -->
   <uses-permission android:name="android.permission.READ_SYNC_STATS" />
 
-  <!-- ***************************** -->
-  <!-- Exclude OpenTasks permissions -->
-  <!-- ***************************** -->
+  <!-- ****************************************** -->
+  <!-- Exclude OpenTasks and jtxBoard permissions -->
+  <!-- ****************************************** -->
   <uses-permission android:name="org.dmfs.permission.READ_TASKS" tools:node="remove"/>
   <uses-permission android:name="org.dmfs.permission.WRITE_TASKS" tools:node="remove"/>
   <permission-group android:name="org.dmfs.tasks.permissiongroup.Tasks" tools:node="remove"/>
@@ -86,6 +87,8 @@
   <uses-permission
       android:name="${applicationId}.permission.WRITE_TASKS"
       tools:node="remove" />
+  <uses-permission android:name="at.techbee.jtx.permission.READ" tools:node="remove" />
+  <uses-permission android:name="at.techbee.jtx.permission.WRITE" tools:node="remove" />
 
   <!-- ============================================== Exported Permissions = -->
 
@@ -191,26 +194,6 @@
       android:theme="@style/TranslucentDialog"
       android:windowSoftInputMode="stateHidden" >
     </activity>
-
-    <meta-data
-      android:name="firebase_crashlytics_collection_enabled"
-      android:value="false"/>
-
-    <meta-data
-      android:name="firebase_analytics_collection_enabled"
-      android:value="false"/>
-
-    <meta-data
-      android:name="google_analytics_adid_collection_enabled"
-      android:value="false" />
-
-    <meta-data
-      android:name="google_analytics_ssaid_collection_enabled"
-      android:value="false" />
-
-    <meta-data
-      android:name="google_analytics_default_allow_ad_personalization_signals"
-      android:value="false" />
 
     <meta-data
       android:name="com.google.android.backup.api_key"
@@ -453,12 +436,6 @@
       android:name=".activities.PlaceSettingsActivity"
       android:theme="@style/Tasks" />
 
-    <activity
-      android:name="com.todoroo.astrid.gcal.CalendarReminderActivity"
-      android:theme="@style/TasksDialog"/>
-
-    <receiver android:name="com.todoroo.astrid.gcal.CalendarAlarmReceiver"/>
-
     <activity android:name=".activities.GoogleTaskListSettingsActivity"/>
 
     <activity
@@ -511,12 +488,6 @@
     <service
       android:exported="false"
       android:name=".scheduling.NotificationSchedulerIntentService"
-      android:permission="android.permission.BIND_JOB_SERVICE"/>
-
-    <receiver android:name=".scheduling.CalendarNotificationIntentService$Broadcast"/>
-    <service
-      android:exported="false"
-      android:name=".scheduling.CalendarNotificationIntentService"
       android:permission="android.permission.BIND_JOB_SERVICE"/>
 
     <receiver android:name=".notifications.NotificationClearedReceiver"/>
@@ -675,6 +646,14 @@
       android:name=".preferences.ManageSpaceActivity"
       android:theme="@style/Tasks" />
       <activity android:name="org.tasks.sync.microsoft.MicrosoftListSettingsActivity" />
+
+      <activity
+          android:name="org.tasks.dialogs.SortSettingsActivity"
+          android:theme="@style/TranslucentWindow" />
+
+    <activity
+        android:name="org.tasks.repeats.CustomRecurrenceActivity"
+        android:theme="@style/Tasks" />
 
     <!-- launcher icons -->
 

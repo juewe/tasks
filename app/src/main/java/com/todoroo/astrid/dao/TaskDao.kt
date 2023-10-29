@@ -13,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import org.tasks.LocalBroadcastManager
-import org.tasks.data.SubtaskInfo
 import org.tasks.data.TaskContainer
 import org.tasks.data.TaskDao
 import org.tasks.date.DateTimeUtils.isAfterNow
@@ -107,14 +106,13 @@ class TaskDao @Inject constructor(
         }
 
     suspend fun save(task: Task, original: Task?) {
-        if (taskDao.update(task, original)) {
-            afterUpdate(task, original)
-        }
+        val updated = taskDao.update(task, original)
+        afterUpdate(updated, original)
     }
 
     private suspend fun afterUpdate(task: Task, original: Task?) {
-        val completionDateModified = task.completionDate != original?.completionDate ?: 0
-        val deletionDateModified = task.deletionDate != original?.deletionDate ?: 0
+        val completionDateModified = task.completionDate != (original?.completionDate ?: 0)
+        val deletionDateModified = task.deletionDate != (original?.deletionDate ?: 0)
         val justCompleted = completionDateModified && task.isCompleted
         val justDeleted = deletionDateModified && task.isDeleted
         if (task.calendarURI?.isNotBlank() == true) {
@@ -151,7 +149,7 @@ class TaskDao @Inject constructor(
 
     internal suspend fun insert(task: Task): Long = taskDao.insert(task)
 
-    internal suspend fun fetchTasks(callback: suspend (SubtaskInfo) -> List<String>): List<TaskContainer> =
+    internal suspend fun fetchTasks(callback: suspend () -> List<String>): List<TaskContainer> =
             taskDao.fetchTasks(callback)
 
     internal suspend fun getAll(): List<Task> = taskDao.getAll()

@@ -1,7 +1,11 @@
 package org.tasks.data
 
-import androidx.paging.DataSource
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.room.Update
+import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
 import com.todoroo.andlib.sql.Criterion
 import com.todoroo.andlib.sql.Field
@@ -38,7 +42,7 @@ abstract class TaskDao(private val database: Database) {
     @Query("SELECT COUNT(1) FROM tasks WHERE timerStart > 0 AND deleted = 0")
     abstract suspend fun activeTimers(): Int
 
-    @Query("SELECT COUNT(1) FROM tasks INNER JOIN alarms ON tasks._id = alarms.task WHERE type = $TYPE_SNOOZE")
+    @Query("SELECT COUNT(1) FROM tasks INNER JOIN alarms ON tasks._id = alarms.task WHERE deleted = 0 AND completed = 0 AND type = $TYPE_SNOOZE")
     abstract suspend fun snoozedReminders(): Int
 
     @Query("SELECT COUNT(1) FROM tasks INNER JOIN notification ON tasks._id = notification.task")
@@ -96,14 +100,10 @@ abstract class TaskDao(private val database: Database) {
             + "WHERE completed > 0 AND calendarUri IS NOT NULL AND calendarUri != ''")
     abstract suspend fun clearCompletedCalendarEvents(): Int
 
-    open suspend fun fetchTasks(callback: suspend (SubtaskInfo) -> List<String>): List<TaskContainer> {
-        return fetchTasks(getSubtaskInfo(), callback)
-    }
-
-    open suspend fun fetchTasks(subtasks: SubtaskInfo, callback: suspend (SubtaskInfo) -> List<String>): List<TaskContainer> =
+    open suspend fun fetchTasks(callback: suspend () -> List<String>): List<TaskContainer> =
             database.withTransaction {
                 val start = if (BuildConfig.DEBUG) now() else 0
-                val queries = callback(subtasks)
+                val queries = callback()
                 val last = queries.size - 1
                 for (i in 0 until last) {
                     query(SimpleSQLiteQuery(queries[i]))
@@ -115,7 +115,7 @@ abstract class TaskDao(private val database: Database) {
 
     suspend fun fetchTasks(preferences: Preferences, filter: Filter): List<TaskContainer> =
             fetchTasks {
-                TaskListQuery.getQuery(preferences, filter, it)
+                TaskListQuery.getQuery(preferences, filter)
             }
 
     @RawQuery
@@ -126,12 +126,6 @@ abstract class TaskDao(private val database: Database) {
 
     @RawQuery
     abstract suspend fun count(query: SimpleSQLiteQuery): Int
-
-    @Query("SELECT EXISTS(SELECT 1 FROM tasks WHERE parent > 0 AND deleted = 0) AS hasSubtasks")
-    abstract suspend fun getSubtaskInfo(): SubtaskInfo
-
-    @RawQuery(observedEntities = [Place::class])
-    abstract fun getTaskFactory(query: SimpleSQLiteQuery): DataSource.Factory<Int, TaskContainer>
 
     suspend fun touch(ids: List<Long>, now: Long = currentTimeMillis()) =
         ids.eachChunk { internalTouch(it, now) }
@@ -184,7 +178,7 @@ FROM recursive_tasks
     internal suspend fun setCollapsed(preferences: Preferences, filter: Filter, collapsed: Boolean) {
         fetchTasks(preferences, filter)
                 .filter(TaskContainer::hasChildren)
-                .map(TaskContainer::getId)
+                .map(TaskContainer::id)
                 .eachChunk { setCollapsed(it, collapsed) }
     }
 
@@ -194,15 +188,19 @@ FROM recursive_tasks
     @Insert
     abstract suspend fun insert(task: Task): Long
 
-    suspend fun update(task: Task, original: Task? = null): Boolean {
-        if (!task.insignificantChange(original)) {
-            task.modificationDate = now()
-        }
-        return updateInternal(task) == 1
-    }
+    suspend fun update(task: Task, original: Task? = null): Task =
+        task
+            .copy(
+                modificationDate = when {
+                    original?.let { task.significantChange(it) } == true -> now()
+                    task.modificationDate == 0L -> task.creationDate
+                    else -> task.modificationDate
+                }
+            )
+            .also { updateInternal(it) }
 
     @Update
-    internal abstract suspend fun updateInternal(task: Task): Int
+    internal abstract suspend fun updateInternal(task: Task)
 
     suspend fun createNew(task: Task): Long {
         task.id = NO_ID
@@ -221,21 +219,21 @@ FROM recursive_tasks
     }
 
     suspend fun count(filter: Filter): Int {
-        val query = getQuery(filter.sqlQuery, Field.COUNT)
+        val query = getQuery(filter.sql!!, Field.COUNT)
         val start = if (BuildConfig.DEBUG) now() else 0
         val count = count(query)
         Timber.v("%sms: %s", now() - start, query.sql)
         return count
     }
 
-    suspend fun fetchFiltered(filter: Filter): List<Task> = fetchFiltered(filter.getSqlQuery())
+    suspend fun fetchFiltered(filter: Filter): List<Task> = fetchFiltered(filter.sql!!)
 
     suspend fun fetchFiltered(queryTemplate: String): List<Task> {
         val query = getQuery(queryTemplate, Task.FIELDS)
         val start = if (BuildConfig.DEBUG) now() else 0
         val tasks = fetchTasks(query)
         Timber.v("%sms: %s", now() - start, query.sql)
-        return tasks.map(TaskContainer::getTask)
+        return tasks.map(TaskContainer::task)
     }
 
     @Query("""

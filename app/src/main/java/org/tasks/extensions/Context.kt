@@ -3,12 +3,19 @@ package org.tasks.extensions
 import android.content.ActivityNotFoundException
 import android.content.ContentResolver
 import android.content.Context
+import android.content.Context.MODE_PRIVATE
 import android.content.Intent
 import android.content.Intent.ACTION_VIEW
+import android.content.res.Configuration
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.Uri
+import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.annotation.AnyRes
 import androidx.browser.customtabs.CustomTabsIntent
+import com.franmontiel.persistentcookiejar.persistence.SharedPrefsCookiePersistor
 import org.tasks.R
 
 object Context {
@@ -22,6 +29,18 @@ object Context {
             toast(R.string.no_app_found)
         }
     }
+
+    fun Context.hideKeyboard(view: View) {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(view.windowToken, 0)
+        view.clearFocus()
+    }
+
+    val Context.nightMode: Int
+        get() = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+
+    val Context.isNightMode: Boolean
+        get() = nightMode == Configuration.UI_MODE_NIGHT_YES
 
     fun Context.openUri(resId: Int, vararg formatArgs: Any) = openUri(getString(resId, formatArgs))
 
@@ -49,10 +68,28 @@ object Context {
     fun Context.toast(text: String?, duration: Int = Toast.LENGTH_LONG) =
         text?.let { Toast.makeText(this, it, duration).show() }
 
-    fun Context.getResourceUri(@AnyRes res: Int) =
+    fun Context.getResourceUri(@AnyRes res: Int): Uri =
         Uri.Builder()
             .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
             .authority(packageName)
             .path(res.toString())
             .build()
+
+    fun Context.cookiePersistor(key: String? = null) =
+        SharedPrefsCookiePersistor(
+            getSharedPreferences(
+                "CookiePersistence${key?.let { "_$it" } ?: ""}",
+                MODE_PRIVATE
+            )
+        )
+
+    fun Context.hasNetworkConnectivity(): Boolean {
+        return try {
+            with(getSystemService(ConnectivityManager::class.java)) {
+                getNetworkCapabilities(activeNetwork)?.hasCapability(NET_CAPABILITY_INTERNET) == true
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
 }

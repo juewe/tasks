@@ -10,7 +10,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tasks.BuildConfig
 import org.tasks.LocalBroadcastManager
 import org.tasks.caldav.VtodoCache
-import org.tasks.data.*
+import org.tasks.data.CaldavAccount
+import org.tasks.data.CaldavDao
+import org.tasks.data.CaldavTask
+import org.tasks.data.GoogleTaskDao
+import org.tasks.data.GoogleTaskListDao
+import org.tasks.data.TaskDao
 import org.tasks.db.DbUtils.dbchunk
 import org.tasks.preferences.Preferences
 import org.tasks.sync.SyncAdapters
@@ -33,14 +38,25 @@ class TaskMover @Inject constructor(
         val googleTaskLists = googleTaskDao.getLists(tasks)
         if (caldavCalendars.isEmpty()) {
             if (googleTaskLists.size == 1) {
-                return GtasksFilter(googleTaskListDao.getByRemoteId(googleTaskLists[0]))
+                return googleTaskListDao.getByRemoteId(googleTaskLists[0])?.let { GtasksFilter(it) }
             }
         } else if (googleTaskLists.isEmpty()) {
             if (caldavCalendars.size == 1) {
-                return CaldavFilter(caldavDao.getCalendar(caldavCalendars[0]))
+                return caldavDao.getCalendar(caldavCalendars[0])?.let { CaldavFilter(it) }
             }
         }
         return null
+    }
+
+    suspend fun move(task: Long, list: Long) {
+        val calendar = caldavDao.getCalendarById(list) ?: return
+        val account = calendar.account?.let { caldavDao.getAccountByUuid(it) } ?: return
+        move(
+            ids = listOf(task),
+            selectedList = if (account.accountType == CaldavAccount.TYPE_GOOGLE_TASKS)
+                GtasksFilter(calendar)
+            else
+                CaldavFilter(calendar))
     }
 
     suspend fun move(ids: List<Long>, selectedList: Filter) {
@@ -91,19 +107,35 @@ class TaskMover @Inject constructor(
                 val listId = selected.remoteId
                 googleTaskDao.insertAndShift(
                     task = task,
-                    caldavTask = CaldavTask(id, listId, remoteId = null),
+                    caldavTask = CaldavTask(
+                        task = id,
+                        calendar = listId,
+                        remoteId = null,
+                    ),
                     top = preferences.addTasksToTop()
                 )
                 children.takeIf { it.isNotEmpty() }
-                        ?.map { CaldavTask(task = it, calendar = listId, remoteId = null) }
+                        ?.map {
+                            CaldavTask(
+                                task = it,
+                                calendar = listId,
+                                remoteId = null,
+                            )
+                        }
                         ?.let { googleTaskDao.insert(it) }
             }
             is CaldavFilter -> {
                 val listId = selected.uuid
-                val newParent = CaldavTask(id, listId)
+                val newParent = CaldavTask(
+                    task = id,
+                    calendar = listId,
+                )
                 caldavDao.insert(task, newParent, preferences.addTasksToTop())
                 children.map {
-                    val newChild = CaldavTask(it, listId)
+                    val newChild = CaldavTask(
+                        task = it,
+                        calendar = listId
+                    )
                     newChild.remoteParent = newParent.remoteId
                     newChild
                 }.let { caldavDao.insert(it) }
@@ -131,12 +163,22 @@ class TaskMover @Inject constructor(
                 val from = caldavDao.getCalendar(caldavTask.calendar!!)
                 val id1 = caldavTask.task
                 val listId = selected.uuid
-                val newParent = CaldavTask(id1, listId, caldavTask.remoteId, caldavTask.`object`)
+                val newParent = CaldavTask(
+                    task = id1,
+                    calendar = listId,
+                    remoteId = caldavTask.remoteId,
+                    `object` = caldavTask.`object`,
+                )
                 vtodoCache.move(from!!, selected.calendar, caldavTask)
                 caldavDao.insert(task, newParent, preferences.addTasksToTop())
                 children.takeIf { it.isNotEmpty() }
                         ?.map {
-                            val newChild = CaldavTask(it.task, listId, it.remoteId, it.`object`)
+                            val newChild = CaldavTask(
+                                task = it.task,
+                                calendar = listId,
+                                remoteId = it.remoteId,
+                                `object` = it.`object`,
+                            )
                             vtodoCache.move(from, selected.calendar, it)
                             newChild.remoteParent = it.remoteParent
                             newChild
@@ -155,10 +197,16 @@ class TaskMover @Inject constructor(
                 val id = task.id
                 val listId = selected.uuid
                 val tasks: MutableMap<Long, CaldavTask> = HashMap()
-                val root = CaldavTask(id, listId)
+                val root = CaldavTask(
+                    task = id,
+                    calendar = listId,
+                )
                 val children = taskDao.getChildren(id).mapNotNull { taskDao.fetch(it) }
                 for (child in children) {
-                    val newTask = CaldavTask(child.id, listId)
+                    val newTask = CaldavTask(
+                        task = child.id,
+                        calendar = listId,
+                    )
                     val parent = child.parent
                     newTask.remoteParent = (if (parent == id) root else tasks[parent])!!.remoteId
                     tasks[child.id] = newTask
@@ -176,11 +224,21 @@ class TaskMover @Inject constructor(
         val listId = filter.remoteId
         googleTaskDao.insertAndShift(
             task,
-            CaldavTask(id, listId, remoteId = null),
+            CaldavTask(
+                task = id,
+                calendar = listId,
+                remoteId = null
+            ),
             preferences.addTasksToTop()
         )
         children.takeIf { it.isNotEmpty() }
-                ?.map { CaldavTask(it, listId, remoteId = null) }
+                ?.map {
+                    CaldavTask(
+                        task = it,
+                        calendar = listId,
+                        remoteId = null
+                    )
+                }
                 ?.let { googleTaskDao.insert(it) }
     }
 }

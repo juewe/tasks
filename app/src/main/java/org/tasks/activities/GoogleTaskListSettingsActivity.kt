@@ -25,7 +25,9 @@ import org.tasks.data.CaldavAccount
 import org.tasks.data.CaldavCalendar
 import org.tasks.data.GoogleTaskListDao
 import org.tasks.databinding.ActivityGoogleTaskListSettingsBinding
+import org.tasks.extensions.Context.hideKeyboard
 import org.tasks.extensions.Context.toast
+import org.tasks.themes.CustomIcons
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -42,6 +44,7 @@ class GoogleTaskListSettingsActivity : BaseListSettingsActivity() {
     private val createListViewModel: CreateListViewModel by viewModels()
     private val renameListViewModel: RenameListViewModel by viewModels()
     private val deleteListViewModel: DeleteListViewModel by viewModels()
+    override val defaultIcon: Int = CustomIcons.LIST
 
     override fun onCreate(savedInstanceState: Bundle?) {
         gtasksList = intent.getParcelableExtra(EXTRA_STORE_DATA)
@@ -76,7 +79,7 @@ class GoogleTaskListSettingsActivity : BaseListSettingsActivity() {
     override val isNew: Boolean
         get() = isNewList
 
-    override val toolbarTitle: String?
+    override val toolbarTitle: String
         get() = if (isNew) getString(R.string.new_list) else gtasksList.name!!
 
     private fun showProgressIndicator() {
@@ -123,8 +126,7 @@ class GoogleTaskListSettingsActivity : BaseListSettingsActivity() {
     }
 
     override fun finish() {
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.hideSoftInputFromWindow(name.windowToken, 0)
+        hideKeyboard(name)
         super.finish()
     }
 

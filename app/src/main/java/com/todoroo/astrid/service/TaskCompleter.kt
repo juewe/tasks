@@ -3,13 +3,14 @@ package com.todoroo.astrid.service
 import android.app.NotificationManager
 import android.app.NotificationManager.INTERRUPTION_FILTER_ALL
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT
 import android.media.RingtoneManager
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.astrid.dao.TaskDao
 import com.todoroo.astrid.data.Task
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tasks.LocalBroadcastManager
-import org.tasks.data.GoogleTaskDao
 import org.tasks.jobs.WorkManager
 import org.tasks.preferences.Preferences
 import timber.log.Timber
@@ -18,7 +19,6 @@ import javax.inject.Inject
 class TaskCompleter @Inject internal constructor(
     @ApplicationContext private val context: Context,
     private val taskDao: TaskDao,
-    private val googleTaskDao: GoogleTaskDao,
     private val preferences: Preferences,
     private val notificationManager: NotificationManager,
     private val localBroadcastManager: LocalBroadcastManager,
@@ -74,7 +74,16 @@ class TaskCompleter @Inject internal constructor(
             preferences
                 .completionSound
                 ?.takeUnless { preferences.isCurrentlyQuietHours }
-                ?.let { RingtoneManager.getRingtone(context, it).play() }
+                ?.let {
+                    RingtoneManager
+                        .getRingtone(context, it)
+                        .apply {
+                            audioAttributes = AudioAttributes.Builder()
+                                .setUsage(USAGE_NOTIFICATION_EVENT)
+                                .build()
+                        }
+                        .play()
+                }
         }
     }
 }

@@ -2,9 +2,14 @@ package org.tasks.data
 
 import android.content.Context
 import androidx.lifecycle.LiveData
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Transaction
+import androidx.room.Update
 import com.todoroo.andlib.utility.DateUtilities.now
-import com.todoroo.astrid.api.FilterListItem.NO_ORDER
+import com.todoroo.astrid.api.Filter.Companion.NO_ORDER
 import com.todoroo.astrid.core.SortHelper.APPLE_EPOCH
 import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.helper.UUIDHelper
@@ -32,6 +37,9 @@ abstract class CaldavDao {
 
     @Query("SELECT * FROM caldav_lists WHERE cdl_uuid = :uuid LIMIT 1")
     abstract suspend fun getCalendarByUuid(uuid: String): CaldavCalendar?
+
+    @Query("SELECT * FROM caldav_lists WHERE cdl_id = :id LIMIT 1")
+    abstract suspend fun getCalendarById(id: Long): CaldavCalendar?
 
     @Query("SELECT * FROM caldav_lists WHERE cdl_account = :uuid")
     abstract suspend fun getCalendarsByAccount(uuid: String): List<CaldavCalendar>
@@ -305,8 +313,7 @@ GROUP BY caldav_lists.cdl_uuid
     abstract suspend fun updateParents(calendar: String)
 
     @Transaction
-    open suspend fun move(task: TaskContainer, newParent: Long, newPosition: Long?) {
-        val previousParent = task.parent
+    open suspend fun move(task: TaskContainer, previousParent: Long, newParent: Long, newPosition: Long?) {
         val previousPosition = task.caldavSortOrder
         if (newPosition != null) {
             if (newParent == previousParent && newPosition < previousPosition) {

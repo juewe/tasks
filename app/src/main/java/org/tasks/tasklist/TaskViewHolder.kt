@@ -8,25 +8,32 @@ import android.view.ViewGroup
 import android.view.ViewGroup.MarginLayoutParams
 import android.widget.TextView
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.recyclerview.widget.RecyclerView
-import com.google.accompanist.themeadapter.appcompat.AppCompatTheme
+import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.andlib.utility.DateUtilities.now
-import com.todoroo.astrid.activity.MainActivity
+import com.todoroo.astrid.api.CaldavFilter
 import com.todoroo.astrid.api.Filter
+import com.todoroo.astrid.api.GtasksFilter
+import com.todoroo.astrid.api.TagFilter
 import com.todoroo.astrid.core.SortHelper.SORT_DUE
+import com.todoroo.astrid.core.SortHelper.SORT_LIST
 import com.todoroo.astrid.core.SortHelper.SORT_START
-import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.ui.CheckableImageView
 import org.tasks.R
 import org.tasks.compose.ChipGroup
+import org.tasks.compose.FilterChip
+import org.tasks.compose.StartDateChip
+import org.tasks.compose.SubtaskChip
 import org.tasks.data.TaskContainer
 import org.tasks.databinding.TaskAdapterRowBinding
 import org.tasks.date.DateTimeUtils.newDateTime
 import org.tasks.dialogs.Linkify
+import org.tasks.filters.PlaceFilter
 import org.tasks.markdown.Markdown
 import org.tasks.preferences.Preferences
 import org.tasks.time.DateTimeUtils.startOfDay
@@ -70,6 +77,7 @@ class TaskViewHolder internal constructor(
         setOnClickListener { onCompleteBoxClick() }
     }
     private val chipGroup: ComposeView = binding.chipGroup
+    private val alwaysDisplayFullDate: Boolean = preferences.alwaysDisplayFullDate
 
     lateinit var task: TaskContainer
 
@@ -142,18 +150,11 @@ class TaskViewHolder internal constructor(
         markdown.setMarkdown(nameView, task.title)
         setupTitleAndCheckbox()
         setupDueDate(sortMode == SORT_DUE)
-        setupChips(filter, sortMode == SORT_START)
-
-        if ((context as MainActivity).isCompletedHeader){
-            val completedDate =  if (task.getTask().completionDate > 0 )  " [" + DateUtilities.getLongDateStringWithTime(task.getTask().completionDate, Locale.GERMAN)+"]" else ""
-            val info = if(task.parentTitle == null) "" else task.parentTitle
-            if (task.parentTitle==null){
-                nameView.append(completedDate);
-            } else{
-                markdown.setMarkdown(description, info + " " + completedDate);
-                description.visibility = if ((context as MainActivity).isCompletedHeader) View.VISIBLE else View.GONE;
-            }
-        } else
+        setupChips(
+            filter = filter,
+            sortByStartDate = sortMode == SORT_START,
+            sortByList = sortMode == SORT_LIST
+        )
         if (preferences.getBoolean(R.string.p_show_description, true)) {
             markdown.setMarkdown(description, task.notes)
             description.visibility = if (task.hasNotes()) View.VISIBLE else View.GONE
@@ -200,7 +201,7 @@ class TaskViewHolder internal constructor(
             nameView.paintFlags = nameView.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
         }
         completeBox.isChecked = task.isCompleted
-        completeBox.setImageDrawable(checkBoxProvider.getCheckBox(task.getTask()))
+        completeBox.setImageDrawable(checkBoxProvider.getCheckBox(task.task))
         completeBox.invalidate()
     }
 
@@ -212,14 +213,13 @@ class TaskViewHolder internal constructor(
                 dueDate.setTextColor(textColorSecondary)
             }
             val dateValue: String? = if (sortByDueDate
-                    && task.sortGroup >= now().startOfDay()
-                    && preferences.showGroupHeaders()
+                    && (task.sortGroup ?: 0) >= now().startOfDay()
             ) {
                 task.takeIf { it.hasDueTime() }?.let {
                     DateUtilities.getTimeString(context, newDateTime(task.dueDate))
                 }
             } else {
-                DateUtilities.getRelativeDateTime(context, task.dueDate, locale, FormatStyle.MEDIUM, preferences.alwaysDisplayFullDate, false)
+                DateUtilities.getRelativeDateTime(context, task.dueDate, locale, FormatStyle.MEDIUM, alwaysDisplayFullDate, false)
             }
             dueDate.text = dateValue
             dueDate.visibility = View.VISIBLE
@@ -228,32 +228,101 @@ class TaskViewHolder internal constructor(
         }
     }
 
-    private fun setupChips(filter: Filter, sortByStartDate: Boolean) {
+    private fun setupChips(filter: Filter, sortByStartDate: Boolean, sortByList: Boolean) {
+        val id = task.id
+        val children = task.children
+        val collapsed = task.isCollapsed
+        val isHidden = task.isHidden
+        val sortGroup = task.sortGroup
+        val startDate = task.task.hideUntil
+        val place = task.location?.place
+        val list = task.caldav
+        val tagsString = task.tagsString
+        val isSubtask = task.hasParent()
+        val isGoogleTask = task.isGoogleTask
+        val appearance = preferences.getIntegerFromString(R.string.p_chip_appearance, 0)
+        val showText = appearance != 2
+        val showIcon = appearance != 1
+        val toggleSubtasks = { task: Long, collapsed: Boolean -> callback.toggleSubtasks(task, collapsed) }
+        val onClick = { it: Filter -> callback.onClick(it) }
         chipGroup.setContent {
-            AppCompatTheme {
+            MdcTheme {
                 ChipGroup(
                     modifier = Modifier.padding(
                         end = 16.dp,
                         bottom = rowPaddingDp.dp
                     )
                 ) {
-                    chipProvider.Chips(
-                        filter = filter,
-                        id = task.id,
-                        children = task.children,
-                        collapsed = task.isCollapsed,
-                        isHidden = task.isHidden,
-                        sortGroup = task.sortGroup,
-                        startDate = task.startDate,
-                        place = task.location?.place,
-                        list = task.caldav,
-                        tagsString = task.tagsString,
-                        isSubtask = task.hasParent(),
-                        isGoogleTask = task.isGoogleTask,
-                        sortByStartDate = sortByStartDate,
-                        toggleSubtasks = { task: Long, collapsed: Boolean -> callback.toggleSubtasks(task, collapsed) },
-                        onClick = { it: Filter -> callback.onClick(it) },
-                    )
+                    if (children > 0 && remember { preferences.showSubtaskChip }) {
+                        SubtaskChip(
+                            collapsed = collapsed,
+                            children = children,
+                            compact = !showText,
+                            onClick = { toggleSubtasks(id, !collapsed) }
+                        )
+                    }
+                    if (isHidden && remember { preferences.showStartDateChip }) {
+                        StartDateChip(
+                            sortGroup = sortGroup,
+                            startDate = startDate,
+                            compact = !showText,
+                            timeOnly = sortByStartDate,
+                            colorProvider = { chipProvider.getColor(it) },
+                        )
+                    }
+                    if (place != null && filter !is PlaceFilter && remember { preferences.showPlaceChip }) {
+                        FilterChip(
+                            filter = PlaceFilter(place),
+                            defaultIcon = R.drawable.ic_outline_place_24px,
+                            onClick = onClick,
+                            showText = showText,
+                            showIcon = showIcon,
+                            colorProvider = { chipProvider.getColor(it) },
+                        )
+                    }
+
+                    if (
+                        !isSubtask &&
+                        !sortByList &&
+                        preferences.showListChip &&
+                        filter !is CaldavFilter &&
+                        filter !is GtasksFilter
+                    ) {
+                        remember(list, isGoogleTask) {
+                            chipProvider.lists
+                                .getCaldavList(list)
+                                ?.let { if (isGoogleTask) GtasksFilter(it) else CaldavFilter(it) }
+                        }?.let {
+                            FilterChip(
+                                filter = it,
+                                defaultIcon = R.drawable.ic_list_24px,
+                                onClick = onClick,
+                                showText = showText,
+                                showIcon = showIcon,
+                                colorProvider = { chipProvider.getColor(it) },
+                            )
+                        }
+                    }
+                    if (!tagsString.isNullOrBlank() && remember { preferences.showTagChip }) {
+                        remember(tagsString, filter) {
+                            val tags = tagsString.split(",").toHashSet()
+                            if (filter is TagFilter) {
+                                tags.remove(filter.uuid)
+                            }
+                            tags.mapNotNull { chipProvider.lists.getTag(it) }
+                                .sortedBy(TagFilter::title)
+                        }
+                            .forEach {
+                                FilterChip(
+                                    filter = it,
+                                    defaultIcon = R.drawable.ic_outline_label_24px,
+                                    onClick = onClick,
+                                    showText = showText,
+                                    showIcon = showIcon,
+                                    colorProvider = { chipProvider.getColor(it) },
+                                )
+                            }
+                    }
                 }
             }
         }

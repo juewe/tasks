@@ -22,7 +22,7 @@ import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.lifecycleScope
 import at.bitfire.dav4jvm.exception.HttpException
 import com.franmontiel.persistentcookiejar.persistence.CookiePersistor
-import com.google.accompanist.themeadapter.appcompat.AppCompatTheme
+import com.google.android.material.composethemeadapter.MdcTheme
 import com.google.android.material.snackbar.BaseTransientBottomBar
 import com.google.android.material.snackbar.Snackbar
 import com.todoroo.astrid.data.Task
@@ -41,7 +41,10 @@ import org.tasks.data.CaldavDao
 import org.tasks.databinding.ActivityCaldavAccountSettingsBinding
 import org.tasks.dialogs.DialogBuilder
 import org.tasks.dialogs.Linkify
+import org.tasks.extensions.Context.cookiePersistor
+import org.tasks.extensions.Context.hideKeyboard
 import org.tasks.extensions.Context.openUri
+import org.tasks.extensions.addBackPressedCallback
 import org.tasks.injection.ThemedInjectingAppCompatActivity
 import org.tasks.security.KeyStoreEncryption
 import org.tasks.ui.DisplayableException
@@ -59,7 +62,6 @@ abstract class BaseCaldavAccountSettingsActivity : ThemedInjectingAppCompatActiv
     @Inject lateinit var taskDeleter: TaskDeleter
     @Inject lateinit var inventory: Inventory
     @Inject lateinit var firebase: Firebase
-    @Inject lateinit var cookiePersistor: CookiePersistor
 
     protected var caldavAccount: CaldavAccount? = null
     protected lateinit var binding: ActivityCaldavAccountSettingsBinding
@@ -136,13 +138,17 @@ abstract class BaseCaldavAccountSettingsActivity : ThemedInjectingAppCompatActiv
         )
         binding.password.setOnFocusChangeListener { _, hasFocus -> onPasswordFocused(hasFocus) }
         binding.serverSelector.setContent {
-            AppCompatTheme {
+            MdcTheme {
                 var selected by rememberSaveable { serverType }
                 ServerSelector(selected) {
                     serverType.value = it
                     selected = it
                 }
             }
+        }
+
+        addBackPressedCallback {
+            discard()
         }
     }
 
@@ -327,14 +333,9 @@ abstract class BaseCaldavAccountSettingsActivity : ThemedInjectingAppCompatActiv
 
     override fun finish() {
         if (!requestInProgress()) {
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            imm.hideSoftInputFromWindow(binding.name.windowToken, 0)
+            hideKeyboard(binding.name)
             super.finish()
         }
-    }
-
-    override fun onBackPressed() {
-        discard()
     }
 
     private fun removeAccountPrompt() {
@@ -350,7 +351,7 @@ abstract class BaseCaldavAccountSettingsActivity : ThemedInjectingAppCompatActiv
     }
 
     protected open suspend fun removeAccount() {
-        cookiePersistor.clearSession(caldavAccount?.url)
+        cookiePersistor(caldavAccount?.username).clearSession(caldavAccount?.url)
         taskDeleter.delete(caldavAccount!!)
         setResult(Activity.RESULT_OK)
         finish()

@@ -1,3 +1,158 @@
+### 13.6.1 (2023-11-27)
+
+* Push pending changes when app is backgrounded
+* Don't require internet connection for DAVx5/EteSync/DecSync sync
+* Don't perform background sync for DAVx5/EteSync/DecSync
+  * Background sync is performed by the sync app
+* Preserve modification times on initial sync [#2496](https://github.com/tasks/tasks/issues/2496)
+* Replace deprecated method call [#2547](https://github.com/tasks/tasks/pull/2547) - @kmj-99
+* Improve task list scrolling performance
+* Fix hourly recurrence bug
+* Update translations
+  * Chinese (Simplified) - Eric
+  * Croatian - @milotype
+  * Czech - @ceskyDJ
+  * Finnish - @millerii
+  * French - Lionel HANNEQUIN, Bruno Duyé
+  * Japanese - Kazushi Hayama
+  * Portuguese - @loucurapt
+  * Romanian - @ygorigor
+  * Swedish - @bittin
+
+### 13.6 (2023-10-07)
+
+* Change priority with multi-select [#2257](https://github.com/tasks/tasks/pull/2452) - @vulewuxe86
+* Automatically select newly copied tasks [#2246](https://github.com/tasks/tasks/pull/2446) - @vulewuxe86
+* Reduce minimum size for widgets [#2436](https://github.com/tasks/tasks/pull/2436) - @histefanhere
+* Replace deprecated method call [#2526](https://github.com/tasks/tasks/pull/2526) - @kmj-99
+* Improve handling text shared to Tasks [#2485](https://github.com/tasks/tasks/issues/2485)
+* Use notification audio stream for completion sound
+* Notification preference 'More settings' opens channel settings directly
+* Respect 'New tasks on top' preference when creating subtasks
+* Automatically add due dates for recurring tasks
+* Fix crash on startup
+* Update translations
+  * Brazilian Portuguese - @gorgonun
+  * Bulgarian - @StoyanDimitrov, @salif
+  * Catalan - Joan Montané
+  * Chinese (Simplified) - Poesty Li
+  * Chinese (Traditional) - @abc0922001
+  * Dutch - @fvbommel
+  * French - @FlorianLeChat
+  * German - @qwerty287, deep map, @franconian
+  * Hungarian - Kaci
+  * Italian - @ppasserini
+  * Japanese - Kazushi Hayama, Naga
+  * Spanish - @FlorianLeChat
+  * Swedish - @Anaemix, @bittin
+  * Turkish - @emintufan, @oersen
+  * Ukrainian - @IhorHordiichuk
+
+### 13.5.1 (2023-08-02)
+
+* Fix crash when importing Google Tasks from a backup file
+* Added Burmese translations - @htetoh
+* Update translations
+  * Chinese (Simplified) - Poesty Li
+  * Croatian - @milotype
+  * Japanese - Kazushi Hayama
+  * Polish - @alex-ter
+  * Russian - @alex-ter
+  * Ukrainian - @IhorHordiichuk
+  * Vietnamese - @unbiaseduser
+
+### 13.5 (2023-07-28)
+
+* New custom recurrence picker
+* Update translations
+  * Bulgarian - @StoyanDimitrov
+  * Czech - @ceskyDJ
+  * Dutch - @fvbommel
+  * French - @FlorianLeChat
+  * Italian - @ppasserini
+  * Spanish - @FlorianLeChat
+
+### 13.4 - (2023-07-16)
+
+* Sorting improvements
+  * Add subtask sort configuration
+  * Update sort menu button design
+* Don't show subtasks of hidden tasks in 'My Tasks'
+* Fix Google Tasks sync issue
+* Update translations
+  * Bulgarian - @StoyanDimitrov
+  * Catalan - @and4po, Eudald Puy Polls
+  * Croatian - @milotype
+  * Dutch - @fvbommel
+  * German - @schneidr
+  * Hungarian - Kaci
+  * Japanese - Naga
+  * Korean - Sunjae Choi
+  * Portuguese - @laralem
+  * Swedish - @bittin
+
+### 13.3.2 - (2023-06-02)
+
+* Sorting improvements
+  * Configure sort grouping
+  * Configure sorting within sort group
+  * Configure completed task sorting
+* Fix Google Task list chips showing on widget
+* Update translations
+  * Bulgarian - @StoyanDimitrov
+  * Catalan - @and4po
+  * Chinese (Simplified) - Poesty Li
+  * Croatian - @milotype
+  * Dutch - @fvbommel
+  * French - @FlorianLeChat
+  * German - @qwerty287, @franconian
+  * Hungarian - Kaci
+  * Italian - @ppasserini
+  * Spanish - @FlorianLeChat
+  * Ukrainian - @IhorHordiichuk
+
+### 13.2.4 - (2023-05-24)
+* Add 'By list' sort mode [#1265](https://github.com/tasks/tasks/issues/1265)
+* Save task when pressing done [#2125](https://github.com/tasks/tasks/pull/2125)
+* Use ISO 8601 date formatting for backup filenames [#1550](https://github.com/tasks/tasks/pull/1550)
+* Fix filter sorting bug [#1561](https://github.com/tasks/tasks/issues/1561)
+* Fix manual sorting crash [#2141](https://github.com/tasks/tasks/issues/2141)
+* Fix manual sorting bug [#2101](https://github.com/tasks/tasks/issues/2101)
+* Fix multiple accounts on same server [#2301](https://github.com/tasks/tasks/issues/2301)
+* Don't set `COUNT=0` on recurrence rules [#2158](https://github.com/tasks/tasks/issues/2158)
+* Improve task list performance [#2062](https://github.com/tasks/tasks/issues/2062)
+* Attempt to hide inactive widgets in settings [#2145](https://github.com/tasks/tasks/issues/2145)
+* Disable persistent reminders on Android 14+
+  * Android 14+ no longer supports persistent reminders 😢
+* Fix notifications on Android 14
+* Fix crash when missing exact alarm permissions
+* Update logic for adding default reminders during sync
+  * Don't add reminders on initial sync
+  * Don't add reminders if other client supports reminder sync
+* Internal database changes
+  * You will need to reconfigure any widgets that were set to display a Google
+    Task list or filter. Sorry for the interruption!
+* Add Odia translations - @SubhamJena
+* Update translations
+  * Brazilian Portuguese - @lnux-usr
+  * Bulgarian - @StoyanDimitrov
+  * Catalan - @and4po
+  * Chinese (Simplified) - Poesty Li
+  * Chinese (Traditional) - Chih-Hsuan Yen
+  * Croatian - @milotype
+  * Dutch - @fvbommel
+  * Esperanto - Don Zouras
+  * Finnish - @millerii
+  * French - @FlorianLeChat
+  * Italian - @ppasserini
+  * Japanese - @kisaragi-hiu, Naga
+  * Korean - Sunjae Choi, @o20n3
+  * Romanian - @simonaiacob
+  * Russian - @AHOHNMYC
+  * Spanish - @FlorianLeChat
+  * Turkish - @ersen0
+  * Ukrainian - @IhorHordiichuk
+
 ### 13.1.2 (2023-02-02)
 
 * Add default reminders to incoming iCalendar tasks [#1984](https://github.com/tasks/tasks/issues/1984)

@@ -1,3 +1,7 @@
+plugins {
+    id("com.google.devtools.ksp") version "1.9.10-1.0.13" apply false
+}
+
 buildscript {
     repositories {
         mavenCentral()
@@ -5,16 +9,16 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.android.tools.build:gradle:7.4.2")
-        classpath("com.google.gms:google-services:4.3.15")
-        classpath("com.google.firebase:firebase-crashlytics-gradle:2.9.4")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.kotlin.get()}")
-        classpath("com.google.dagger:hilt-android-gradle-plugin:${libs.versions.dagger.hilt.get()}")
-        classpath("com.google.android.gms:oss-licenses-plugin:0.10.6")
+        classpath(libs.gradle)
+        classpath(libs.google.services)
+        classpath(libs.firebase.crashlytics.gradle)
+        classpath(libs.kotlin.gradle)
+        classpath(libs.dagger.hilt.gradle)
+        classpath(libs.oss.licenses.plugin)
     }
 }
 
 tasks.getByName<Wrapper>("wrapper") {
-    gradleVersion = "8.0.2"
+    gradleVersion = "8.4"
     distributionType = Wrapper.DistributionType.ALL
 }

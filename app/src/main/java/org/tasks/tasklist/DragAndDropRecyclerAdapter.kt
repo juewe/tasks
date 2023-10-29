@@ -4,11 +4,17 @@ import android.graphics.Canvas
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
-import androidx.recyclerview.widget.ItemTouchHelper.*
+import androidx.recyclerview.widget.ItemTouchHelper.ACTION_STATE_DRAG
+import androidx.recyclerview.widget.ItemTouchHelper.Callback
 import androidx.recyclerview.widget.ItemTouchHelper.Callback.makeMovementFlags
+import androidx.recyclerview.widget.ItemTouchHelper.DOWN
+import androidx.recyclerview.widget.ItemTouchHelper.LEFT
+import androidx.recyclerview.widget.ItemTouchHelper.RIGHT
+import androidx.recyclerview.widget.ItemTouchHelper.UP
 import androidx.recyclerview.widget.RecyclerView
 import com.todoroo.astrid.activity.TaskListFragment
 import com.todoroo.astrid.adapter.TaskAdapter
+import com.todoroo.astrid.api.AstridOrderingFilter
 import com.todoroo.astrid.utility.Flags
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -18,7 +24,8 @@ import kotlinx.coroutines.runBlocking
 import org.tasks.activities.DragAndDropDiffer
 import org.tasks.data.TaskContainer
 import org.tasks.preferences.Preferences
-import java.util.*
+import java.util.LinkedList
+import java.util.Queue
 import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.min
@@ -32,9 +39,8 @@ class DragAndDropRecyclerAdapter(
         preferences: Preferences) : TaskListRecyclerAdapter(adapter, viewHolderFactory, taskList, preferences), DragAndDropDiffer<TaskContainer, SectionedDataSource> {
     private val disableHeaders = taskList.getFilter().let {
         !it.supportsSorting()
-                || !preferences.showGroupHeaders()
                 || (it.supportsManualSort() && preferences.isManualSort)
-                || (it.supportsAstridSorting() && preferences.isAstridSort)
+                || (it is AstridOrderingFilter && preferences.isAstridSort)
     }
     private val itemTouchHelper = ItemTouchHelper(ItemTouchHelperCallback()).apply {
         attachToRecyclerView(recyclerView)
@@ -50,14 +56,17 @@ class DragAndDropRecyclerAdapter(
         val viewType = getItemViewType(position)
         if (viewType == 1) {
             val headerSection = items.getSection(position)
-            (holder as HeaderViewHolder).bind(taskList.getFilter(), preferences.sortMode, preferences.alwaysDisplayFullDate, headerSection)
+            (holder as HeaderViewHolder).bind(taskList.getFilter(), preferences.groupMode, headerSection)
         } else {
             super.onBindViewHolder(holder, position)
         }
     }
 
     override val sortMode: Int
-        get() = items.sortMode
+        get() = items.groupMode
+
+    override val subtaskSortMode: Int
+        get() = items.subtaskMode
 
     override fun getItemViewType(position: Int) = if (items.isHeader(position)) 1 else 0
 
@@ -86,11 +95,12 @@ class DragAndDropRecyclerAdapter(
 
     override fun transform(list: List<TaskContainer>): SectionedDataSource =
             SectionedDataSource(
-                list,
-                disableHeaders,
-                preferences.sortMode,
-                adapter.getCollapsed(),
-                preferences.completedTasksAtBottom,
+                tasks = list,
+                disableHeaders = disableHeaders,
+                groupMode = preferences.groupMode,
+                subtaskMode = preferences.subtaskMode,
+                collapsed = adapter.getCollapsed(),
+                completedAtBottom = preferences.completedTasksAtBottom,
             )
 
     override fun diff(last: SectionedDataSource, next: SectionedDataSource) =
@@ -120,7 +130,7 @@ class DragAndDropRecyclerAdapter(
                 taskList.startActionMode()
                 (viewHolder as TaskViewHolder?)!!.moving = true
                 dragging = true
-                val position = viewHolder!!.adapterPosition
+                val position = viewHolder!!.bindingAdapterPosition
                 updateIndents(viewHolder as TaskViewHolder?, position, position)
             }
         }
@@ -128,19 +138,19 @@ class DragAndDropRecyclerAdapter(
         override fun getMovementFlags(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int {
             return when {
                 !dragAndDropEnabled() -> NO_MOVEMENT
-                adapter.isHeader(viewHolder.adapterPosition) -> NO_MOVEMENT
+                adapter.isHeader(viewHolder.bindingAdapterPosition) -> NO_MOVEMENT
                 adapter.numSelected > 0 -> NO_MOVEMENT
                 else -> ALLOW_DRAGGING
             }
-        }
+        }  
 
         override fun onMove(
                 recyclerView: RecyclerView,
                 src: RecyclerView.ViewHolder,
                 target: RecyclerView.ViewHolder): Boolean {
             taskList.finishActionMode()
-            val fromPosition = src.adapterPosition
-            val toPosition = target.adapterPosition
+            val fromPosition = src.bindingAdapterPosition
+            val toPosition = target.bindingAdapterPosition
             val source = src as TaskViewHolder
             val isHeader = isHeader(toPosition)
             if (!isHeader && !adapter.canMove(source.task, fromPosition, (target as TaskViewHolder).task, toPosition)) {
@@ -190,7 +200,7 @@ class DragAndDropRecyclerAdapter(
                         max((currentIndent - minIndent) * -shiftSize, dX)
                     }
                     val targetIndent = currentIndent + java.lang.Float.valueOf(dxAdjusted / shiftSize).toInt()
-                    if (targetIndent != task.getIndent()) {
+                    if (targetIndent != task.indent) {
                         if (from == -1) {
                             taskList.finishActionMode()
                             vh.selected = false
@@ -200,7 +210,7 @@ class DragAndDropRecyclerAdapter(
                         task.targetIndent = minIndent
                     } else task.targetIndent = min(targetIndent, maxIndent)
                 }
-                dX = (task.targetIndent - task.getIndent()) * shiftSize
+                dX = (task.targetIndent - task.indent) * shiftSize
             }
             super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
         }
@@ -221,12 +231,14 @@ class DragAndDropRecyclerAdapter(
                     if (from < to) {
                         to++
                     }
-                    vh.task.setIndent(targetIndent)
+                    vh.task.indent = targetIndent
+                    vh.task.targetIndent = targetIndent
                     vh.indent = targetIndent
                     moved(from, to, targetIndent)
-                } else if (task.getIndent() != targetIndent) {
-                    val position = vh.adapterPosition
-                    vh.task.setIndent(targetIndent)
+                } else if (task.indent != targetIndent) {
+                    val position = vh.bindingAdapterPosition
+                    vh.task.indent = targetIndent
+                    vh.task.targetIndent = targetIndent
                     vh.indent = targetIndent
                     moved(position, position, targetIndent)
                 }
