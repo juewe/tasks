@@ -15,6 +15,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
@@ -110,6 +111,8 @@ class TaskListViewModel @Inject constructor(
 
         _state
             .filter { it.filter != null }
+            .map { it.copy(tasks = TasksResults.Loading) }
+            .distinctUntilChanged()
             .throttleLatest(333)
             .map {
                 val filter = when {
