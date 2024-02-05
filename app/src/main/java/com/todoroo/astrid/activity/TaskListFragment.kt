@@ -42,6 +42,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.room.withTransaction
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
 import com.google.android.material.appbar.AppBarLayout
@@ -63,12 +64,12 @@ import com.todoroo.astrid.api.FilterImpl
 import com.todoroo.astrid.api.GtasksFilter
 import com.todoroo.astrid.api.TagFilter
 import com.todoroo.astrid.core.BuiltInFilterExposer
+import com.todoroo.astrid.dao.Database
 import com.todoroo.astrid.dao.TaskDao
 import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.repeats.RepeatTaskHelper
 import com.todoroo.astrid.service.TaskCompleter
 import com.todoroo.astrid.service.TaskCreator
-import com.todoroo.astrid.service.TaskDeleter
 import com.todoroo.astrid.service.TaskDuplicator
 import com.todoroo.astrid.service.TaskMover
 import com.todoroo.astrid.timers.TimerPlugin
@@ -105,10 +106,10 @@ import org.tasks.dialogs.SortSettingsActivity
 import org.tasks.extensions.Context.openUri
 import org.tasks.extensions.Context.toast
 import org.tasks.extensions.Fragment.safeStartActivityForResult
-import org.tasks.extensions.formatNumber
 import org.tasks.extensions.hideKeyboard
 import org.tasks.extensions.setOnQueryTextListener
 import org.tasks.filters.PlaceFilter
+import org.tasks.markdown.MarkdownProvider
 import org.tasks.preferences.Device
 import org.tasks.preferences.Preferences
 import org.tasks.sync.SyncAdapters
@@ -136,7 +137,6 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
     private val repeatConfirmationReceiver = RepeatConfirmationReceiver()
 
     @Inject lateinit var syncAdapters: SyncAdapters
-    @Inject lateinit var taskDeleter: TaskDeleter
     @Inject lateinit var preferences: Preferences
     @Inject lateinit var dialogBuilder: DialogBuilder
     @Inject lateinit var taskCreator: TaskCreator
@@ -159,6 +159,8 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
     @Inject lateinit var repeatTaskHelper: RepeatTaskHelper
     @Inject lateinit var taskListEventBus: TaskListEventBus
     @Inject lateinit var taskEditEventBus: TaskEditEventBus
+    @Inject lateinit var database: Database
+    @Inject lateinit var markdown: MarkdownProvider
     
     private val listViewModel: TaskListViewModel by viewModels()
     private val mainViewModel: MainActivityViewModel by activityViewModels()
@@ -403,10 +405,7 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
             menu.findItem(R.id.menu_expand_subtasks).isVisible = false
         }
         menu.findItem(R.id.menu_voice_add).isVisible = device.voiceInputAvailable() && filter.isWritable
-        search = binding.toolbar.menu.findItem(R.id.menu_search).also {
-            it.setOnActionExpandListener(this)
-            it.setOnQueryTextListener(this)
-        }
+        search = binding.toolbar.menu.findItem(R.id.menu_search).setOnActionExpandListener(this)
         menu.findItem(R.id.menu_clear_completed).isVisible = filter.isWritable
     }
 
@@ -452,11 +451,28 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
                 true
             }
             R.id.menu_clear_completed -> {
-                dialogBuilder
-                        .newDialog(R.string.clear_completed_tasks_confirmation)
-                        .setPositiveButton(R.string.ok) { _, _ -> clearCompleted() }
-                        .setNegativeButton(R.string.cancel, null)
-                        .show()
+                lifecycleScope.launch {
+                    val tasks = listViewModel.getTasksToClear()
+                    val countString = requireContext().resources.getQuantityString(R.plurals.Ntasks, tasks.size, tasks.size)
+                    if (tasks.isEmpty()) {
+                        context?.toast(R.string.delete_multiple_tasks_confirmation, countString)
+                    } else {
+                        dialogBuilder
+                            .newDialog(R.string.clear_completed_tasks_confirmation)
+                            .setMessage(R.string.clear_completed_tasks_count, countString)
+                            .setPositiveButton(R.string.ok) { _, _ ->
+                                lifecycleScope.launch {
+                                    listViewModel.markDeleted(tasks)
+                                    context?.toast(
+                                        R.string.delete_multiple_tasks_confirmation,
+                                        countString
+                                    )
+                                }
+                            }
+                            .setNegativeButton(R.string.cancel, null)
+                            .show()
+                    }
+                }
                 true
             }
             R.id.menu_filter_settings -> {
@@ -526,11 +542,6 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
             }
             else -> onOptionsItemSelected(item)
         }
-    }
-
-    private fun clearCompleted() = lifecycleScope.launch {
-        val count = taskDeleter.clearCompleted(filter)
-        context?.toast(R.string.delete_multiple_tasks_confirmation, locale.formatNumber(count))
     }
 
     private fun createNewTask() {
@@ -644,7 +655,8 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
     }
 
     override fun onMenuItemActionExpand(item: MenuItem): Boolean {
-        onBackPressed.isEnabled = true
+        onBackPressed.isEnabled = true    
+        search.setOnQueryTextListener(this)
         listViewModel.setSearchQuery("")
         if (preferences.isTopAppBar) {
             binding.toolbar.menu.forEach { it.isVisible = false }
@@ -653,7 +665,9 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
     }
 
     override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
-        onBackPressed.isEnabled = false
+        onBackPressed.isEnabled = false    
+        search.setOnQueryTextListener(null)
+        listViewModel.setFilter(filter)
         listViewModel.setSearchQuery(null)
         if (preferences.isTopAppBar) {
             setupMenu(binding.toolbar)
@@ -847,7 +861,7 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
         finishActionMode()
 
         val result = withContext(NonCancellable) {
-            taskDeleter.markDeleted(tasks)
+            listViewModel.markDeleted(tasks)
         }
         result.forEach { onTaskDelete(it) }
         makeSnackbar(R.string.delete_multiple_tasks_confirmation, result.size.toString())?.show()
@@ -931,7 +945,12 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
             lifecycleScope.launch {
                 val tasks =
                     (intent.getSerializableExtra(EXTRAS_TASK_ID) as? ArrayList<Long>)
-                        ?.let { taskDao.fetch(it) }
+                        ?.let {
+                            // hack to wait for task save transaction to complete
+                            database.withTransaction {
+                                taskDao.fetch(it)
+                            }
+                        }
                         ?.filterNot { it.readOnly }
                         ?.takeIf { it.isNotEmpty() }
                         ?: return@launch
@@ -954,9 +973,10 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
                 }
                 if (isRecurringCompletion) {
                     val task = tasks.first()
+                    val title = markdown.markdown(force = true).toMarkdown(task.title)
                     val text = getString(
                         R.string.repeat_snackbar,
-                        task.title,
+                        title,
                         DateUtilities.getRelativeDateTime(
                             context, task.dueDate, locale, FormatStyle.LONG, true
                         )
