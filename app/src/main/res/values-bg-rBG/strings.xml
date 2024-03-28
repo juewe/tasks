@@ -333,9 +333,9 @@
     <string name="repeats_from">Повтаря се от</string>
     <string name="repeats_single">Повтаря се %s</string>
     <string name="repeats_single_on">Повтаря се %1$s в/ъв %2$s</string>
-    <string name="repeats_single_until">Повтаря се %1$s до %2$s</string>
+    <string name="repeats_single_until">Повтаря се %1$s, завършва на %2$s</string>
     <string name="repeats_single_number_of_times">Повтаря се %1$s, възниква %2$d %3$s</string>
-    <string name="repeats_single_on_until">Повтаря се %1$s в/ъв %2$s до %3$s</string>
+    <string name="repeats_single_on_until">Повтаря се %1$s в/ъв %2$s, завършва на %3$s</string>
     <string name="repeats_single_on_number_of_times">Повтаря се %1$s в/ъв %2$s, възниква %3$d %4$s</string>
     <string name="repeats_minutely">ежеминутно</string>
     <string name="repeats_hourly">ежечасно</string>
@@ -345,9 +345,9 @@
     <string name="repeats_yearly">ежегодишно</string>
     <string name="repeats_plural">Повтаря се всеки %s</string>
     <string name="repeats_plural_on">Повтаря се всеки %1$s в/ъв %2$s</string>
-    <string name="repeats_plural_until">Повтаря се всеки %1$s до %2$s</string>
+    <string name="repeats_plural_until">Повтаря се всеки %1$s, завършва на %2$s</string>
     <string name="repeats_plural_number_of_times">Повтаря се всеки %1$s, възниква %2$d %3$s</string>
-    <string name="repeats_plural_on_until">Повтаря се всеки %1$s в/ъв %2$s до %3$s</string>
+    <string name="repeats_plural_on_until">Повтаря се всеки %1$s в/ъв %2$s, завършва на %3$s</string>
     <string name="repeats_plural_on_number_of_times">Повтаря се всеки %1$s в/ъв %2$s, възниква %3$d %4$s</string>
     <string name="dont_add_to_calendar">Не се добавя в календар</string>
     <string name="default_calendar">Календар по подразбиране</string>
@@ -517,7 +517,6 @@
     <string name="caldav_selection_description">Синхронизиране посредством отворени стандарти</string>
     <string name="choose_synchronization_service">Избор на услуга</string>
     <string name="subtasks_multilevel_google_task">Вложени задачи не се поддържат от Google Tasks</string>
-    <string name="widget_on_click">При докосване</string>
     <string name="whats_new">Какво е новото</string>
     <string name="no_app_found">Липсва приложение, което да обработи тази заявка</string>
     <string name="etesync_selection_description">Синхронизация, шифрована от край до край</string>
@@ -527,14 +526,12 @@
     <string name="now">Сега</string>
     <string name="filter_criteria_unstarted">Незапочнати</string>
     <string name="opacity_row">Непрозрачност на реда</string>
-    <string name="widget_footer">Долен колонтитул</string>
     <string name="widget_due_date_below_title">Под заглавието</string>
     <string name="date_shortcut_tomorrow_evening">Утре вечер</string>
     <string name="date_shortcut_tomorrow_night">Утре през нощта</string>
     <string name="show_unstarted">Незапочнати</string>
     <string name="menu_discard_changes">Отхвърляне на промените</string>
     <string name="opacity_header">Непрозрачност на заглавката</string>
-    <string name="widget_due_date_reschedule">Пренасрочване на задачата</string>
     <string name="widget_due_date_after_title">След заглавието</string>
     <string name="widget_open_list">Отваряне на списък</string>
     <string name="url">Адрес</string>
@@ -550,7 +547,6 @@
     <string name="background_location_permission_required">Tasks събира данни за местоположението, за да прави напомняния на тази основа, дори и когато приложението е затворено или не се използва.</string>
     <string name="when_started">При започване</string>
     <string name="map_theme">Тема на картата</string>
-    <string name="widget_do_nothing">Без действие</string>
     <string name="wearable_notifications_summary">Показване на известия на носимото устройство</string>
     <string name="color_wheel">Цветно колело</string>
     <string name="notification_troubleshooting_summary">Докоснете тук, ако имате проблеми с известията</string>
@@ -729,4 +725,5 @@
     <string name="repeat_monthly_on_day_number">Ежемесечно на %1d ден</string>
     <string name="change_priority">Промяна на приоритет</string>
     <string name="clear_completed_tasks_count">Задачата „%s“ ще бъде премахната</string>
+    <string name="theme_dynamic">Динамична</string>
 </resources>

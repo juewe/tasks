@@ -55,8 +55,8 @@ android {
     defaultConfig {
         testApplicationId = "org.tasks.test"
         applicationId = "org.tasks"
-        versionCode = 130605
-        versionName = "13.6.3"
+        versionCode = 130804
+        versionName = "13.8.1"
         targetSdk = 33
         minSdk = 24
         testInstrumentationRunner = "org.tasks.TestRunner"
@@ -142,6 +142,18 @@ android {
     packagingOptions {
         resources {
             excludes += setOf("META-INF/*.kotlin_module")
+        }
+    }
+
+    testOptions {
+        managedDevices {
+            localDevices {
+                create("pixel2api30") {
+                    device = "Pixel 2"
+                    apiLevel = 30
+                    systemImageSource = "aosp-atd"
+                }
+            }
         }
     }
 

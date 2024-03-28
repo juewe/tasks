@@ -12,15 +12,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.mandatorySystemGestures
 import androidx.core.content.IntentCompat.getParcelableExtra
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
@@ -28,36 +22,23 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.utility.AndroidUtilities
-import com.todoroo.astrid.activity.TaskEditFragment.Companion.newTaskEditFragment
 import com.todoroo.astrid.adapter.SubheaderClickHandler
 import com.todoroo.astrid.api.Filter
 import com.todoroo.astrid.dao.TaskDao
 import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.service.TaskCreator
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.tasks.BuildConfig
 import org.tasks.R
-import org.tasks.Tasks.Companion.IS_GENERIC
-import org.tasks.activities.NavigationDrawerCustomization
 import org.tasks.analytics.Firebase
 import org.tasks.billing.Inventory
-import org.tasks.billing.PurchaseActivity
 import org.tasks.compose.collectAsStateLifecycleAware
-import org.tasks.compose.drawer.DrawerAction
-import org.tasks.compose.drawer.DrawerItem
-import org.tasks.compose.drawer.ModalBottomSheet
-import org.tasks.compose.drawer.SheetState
-import org.tasks.compose.drawer.SheetValue
-import org.tasks.compose.drawer.TaskListDrawer
+import org.tasks.compose.drawer.TasksMenu
 import org.tasks.data.AlarmDao
 import org.tasks.data.LocationDao
 import org.tasks.data.Place
@@ -66,7 +47,6 @@ import org.tasks.databinding.TaskListActivityBinding
 import org.tasks.dialogs.NewFilterDialog
 import org.tasks.dialogs.WhatsNewDialog
 import org.tasks.extensions.Context.nightMode
-import org.tasks.extensions.Context.openUri
 import org.tasks.extensions.hideKeyboard
 import org.tasks.filters.FilterProvider
 import org.tasks.filters.PlaceFilter
@@ -74,8 +54,6 @@ import org.tasks.intents.TaskIntents.getTaskListIntent
 import org.tasks.location.LocationPickerActivity
 import org.tasks.location.LocationPickerActivity.Companion.EXTRA_PLACE
 import org.tasks.preferences.DefaultFilterProvider
-import org.tasks.preferences.HelpAndFeedback
-import org.tasks.preferences.MainPreferences
 import org.tasks.preferences.Preferences
 import org.tasks.themes.ColorProvider
 import org.tasks.themes.Theme
@@ -115,7 +93,6 @@ class MainActivity : AppCompatActivity() {
 
     /** @see android.app.Activity.onCreate
      */
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         theme.applyTheme(this)
@@ -130,113 +107,29 @@ class MainActivity : AppCompatActivity() {
             val state = viewModel.state.collectAsStateLifecycleAware().value
             if (state.drawerOpen) {
                 MdcTheme {
-                    var expanded by remember { mutableStateOf(false) }
-                    val skipPartiallyExpanded = remember(expanded) {
-                        expanded || preferences.isTopAppBar
-                    }
-                    val sheetState = rememberSaveable(
-                        skipPartiallyExpanded,
-                        saver = SheetState.Saver(
-                            skipPartiallyExpanded = skipPartiallyExpanded,
-                            confirmValueChange = { true },
-                        )
-                    ) {
-                        SheetState(
-                            skipPartiallyExpanded = skipPartiallyExpanded,
-                            initialValue = if (skipPartiallyExpanded) SheetValue.Expanded else SheetValue.PartiallyExpanded,
-                            confirmValueChange = { true },
-                            skipHiddenState = false,
-                        )
-                    }
-                    LaunchedEffect(sheetState.currentValue) {
-                        if (sheetState.currentValue == SheetValue.Expanded) {
-                            expanded = true
-                        }
-                    }
-                    ModalBottomSheet(
-                        sheetState = sheetState,
-                        containerColor = MaterialTheme.colors.surface,
-                        onDismissRequest = { viewModel.setDrawerOpen(false) }
-                    ) {
-                        val scope = rememberCoroutineScope()
-                        TaskListDrawer(
-                            begForMoney = state.begForMoney,
-                            filters = state.drawerItems,
-                            onClick = {
-                                when (it) {
-                                    is DrawerItem.Filter -> {
-                                        viewModel.setFilter(it.type())
-                                        scope.launch(Dispatchers.Default) {
-                                            sheetState.hide()
-                                            viewModel.setDrawerOpen(false)
-                                        }
-                                    }
-                                    is DrawerItem.Header -> {
-                                        viewModel.toggleCollapsed(it.type())
-                                    }
-                                }
-                            },
-                            onAddClick = {
-                                scope.launch(Dispatchers.Default) {
-                                    sheetState.hide()
-                                    viewModel.setDrawerOpen(false)
-                                    val subheaderType = it.type()
-                                    val rc = subheaderType.addIntentRc
-                                    if (rc == FilterProvider.REQUEST_NEW_FILTER) {
-                                        NewFilterDialog.newFilterDialog().show(
-                                            supportFragmentManager,
-                                            SubheaderClickHandler.FRAG_TAG_NEW_FILTER
-                                        )
-                                    } else {
-                                        val intent = subheaderType.addIntent ?: return@launch
-                                        startActivityForResult(intent, rc)
-                                    }
-                                }
-                            },
-                            onDrawerAction = {
-                                viewModel.setDrawerOpen(false)
-                                when (it) {
-                                    DrawerAction.PURCHASE ->
-                                        if (IS_GENERIC)
-                                            openUri(R.string.url_donate)
-                                        else
-                                            startActivity(
-                                                Intent(
-                                                    this@MainActivity,
-                                                    PurchaseActivity::class.java
-                                                )
-                                            )
-
-                                    DrawerAction.CUSTOMIZE_DRAWER ->
-                                        startActivity(
-                                            Intent(
-                                                this@MainActivity,
-                                                NavigationDrawerCustomization::class.java
-                                            )
-                                        )
-
-                                    DrawerAction.SETTINGS ->
-                                        settingsRequest.launch(
-                                            Intent(
-                                                this@MainActivity,
-                                                MainPreferences::class.java
-                                            )
-                                        )
-
-                                    DrawerAction.HELP_AND_FEEDBACK ->
-                                        startActivity(
-                                            Intent(
-                                                this@MainActivity,
-                                                HelpAndFeedback::class.java
-                                            )
-                                        )
-                                }
-                            },
-                            onErrorClick = {
-                                startActivity(Intent(this@MainActivity, MainPreferences::class.java))
-                            },
-                        )
-                    }
+                    TasksMenu(
+                        bottomPadding = WindowInsets.mandatorySystemGestures
+                            .asPaddingValues()
+                            .calculateBottomPadding(),
+                        items = state.drawerItems,
+                        begForMoney = state.begForMoney,
+                        isTopAppBar = preferences.isTopAppBar,
+                        setFilter = { viewModel.setFilter(it) },
+                        toggleCollapsed = { viewModel.toggleCollapsed(it) },
+                        addFilter = {
+                            val rc = it.addIntentRc
+                            if (rc == FilterProvider.REQUEST_NEW_FILTER) {
+                                NewFilterDialog.newFilterDialog().show(
+                                    supportFragmentManager,
+                                    SubheaderClickHandler.FRAG_TAG_NEW_FILTER
+                                )
+                            } else {
+                                val intent = it.addIntent ?: return@TasksMenu
+                                startActivityForResult(intent, rc)
+                            }
+                        },
+                        dismiss = { viewModel.setDrawerOpen(false) },
+                    )
                 }
             }
         }
@@ -394,7 +287,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val filter = intent.getFilter
                 ?: intent.getFilterString?.let { defaultFilterProvider.getFilterFromPreference(it) }
-                ?: viewModel.state.value.filter
+                ?: defaultFilterProvider.getStartupFilter()
             val task = getTaskToLoad(filter)
             viewModel.setFilter(filter = filter, task = task)
         }
@@ -430,25 +323,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun newTaskEditFragment(task: Task): TaskEditFragment {
+    private fun newTaskEditFragment(task: Task): TaskEditFragment {
         AndroidUtilities.assertMainThread()
         clearUi()
-        return coroutineScope {
-            withContext(Dispatchers.Default) {
-                val freshTask = async { if (task.isNew) task else taskDao.fetch(task.id) ?: task }
-                val list = async { defaultFilterProvider.getList(task) }
-                val location = async { locationDao.getLocation(task, preferences) }
-                val tags = async { tagDataDao.getTags(task) }
-                val alarms = async { alarmDao.getAlarms(task) }
-                newTaskEditFragment(
-                    freshTask.await(),
-                    list.await(),
-                    location.await(),
-                    tags.await(),
-                    alarms.await(),
-                )
-            }
-        }
+        return TaskEditFragment.newTaskEditFragment(task)
     }
 
     private val isSinglePaneLayout: Boolean

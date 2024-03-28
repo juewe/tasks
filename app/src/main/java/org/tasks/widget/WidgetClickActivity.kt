@@ -67,14 +67,14 @@ class WidgetClickActivity : AppCompatActivity(), OnDismissHandler {
                         preferences,
                         intent.getIntExtra(EXTRA_WIDGET, -1)
                 )
-                val collapsed = widgetPreferences.collapsed
+                val collapsed = widgetPreferences.collapsed.toMutableSet()
                 val group = intent.getLongExtra(EXTRA_GROUP, -1)
                 if (intent.getBooleanExtra(EXTRA_COLLAPSED, false)) {
                     collapsed.add(group)
                 } else {
                     collapsed.remove(group)
                 }
-                widgetPreferences.setCollapsed(collapsed)
+                widgetPreferences.collapsed = collapsed
                 localBroadcastManager.broadcastRefresh()
                 finish()
             }

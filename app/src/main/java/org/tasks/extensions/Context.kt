@@ -1,9 +1,11 @@
 package org.tasks.extensions
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.Intent.ACTION_VIEW
 import android.content.res.Configuration
@@ -41,10 +43,6 @@ object Context {
 
     val Context.isNightMode: Boolean
         get() = nightMode == Configuration.UI_MODE_NIGHT_YES
-
-    @Deprecated("Not supposed to use this")
-    val Context.isSinglePaneLayout: Boolean
-        get() = !resources.getBoolean(R.bool.two_pane_layout)
 
     fun Context.openUri(resId: Int, vararg formatArgs: Any) = openUri(getString(resId, formatArgs))
 
@@ -95,5 +93,14 @@ object Context {
         } catch (e: Exception) {
             false
         }
+    }
+
+    fun Context.findActivity(): Activity? {
+        var context = this
+        while (context is ContextWrapper) {
+            if (context is Activity) return context
+            context = context.baseContext
+        }
+        return null
     }
 }

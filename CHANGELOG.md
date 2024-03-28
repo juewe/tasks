@@ -1,3 +1,67 @@
+### 13.8.1 (2024-03-24)
+
+* Fix copy causing duplicate Google Tasks
+* Fix navigation drawer crash
+* Fix backup import dropping tasks
+
+### 13.8 (2024-03-22)
+
+* Dynamic widget theme (name-your-price subscription required)
+* Replace 'until' with 'ends on' for repeating tasks [#2797](https://github.com/tasks/tasks/pull/2797) - @akwala
+* Fix loading selected list on startup [#2777](https://github.com/tasks/tasks/issues/2777)
+* Fix repeating tasks ending one day early
+* Fix repeating task crash
+* Fix backup import crash
+* Fix Astrid manual ordering crash in widget
+* Update translations
+  * Brazilian Portuguese - @mayhmemo
+  * Bulgarian - @StoyanDimitrov
+  * Catalan - @ferranpujolcamins
+  * Chinese (Simplified) - 大王叫我来巡山
+  * Croatian - @milotype
+  * Czech - Odweta
+  * German - @macpac59
+  * Italian - @ppasserini
+  * Spanish - gallegonovato
+  * Swedish - @bittin
+  * Ukrainian - @IhorHordiichuk
+  * Vietnamese - @ngocanhtve
+
+### 13.7 (2024-02-07)
+
+* Fix returning to previous filter after search [#2700](https://github.com/tasks/tasks/pull/2700)
+* Fix wearable notifications on Android 14+
+* Fix issue causing repeating tasks to not repeat
+* Fix dragging a task into a subtask in another list
+* Rewrote navigation drawer in Jetpack Compose
+* Internal changes to navigation
+* Enable multi-select when adding attachments
+* Show count of tasks to be deleted when clearing completed
+* Include hidden subtasks when clearing completed [#2724](https://github.com/tasks/tasks/issues/2724)
+* Don't show hidden or completed tasks in snoozed filter
+* Remove markdown from repeating task snackbar
+* Update translations
+  * Azerbaijani - Shaban Mamedov
+  * Bulgarian - @StoyanDimitrov
+  * Catalan - raulmagdalena
+  * Chinese (Simplified) - 大王叫我来巡山
+  * Chinese (Traditional) - @abc0922001
+  * Croatian - @milotype
+  * Dutch - @mm4c
+  * Esperanto - Don Zouras
+  * Finnish - @millerii
+  * French - J. Lavoie
+  * German - @CennoxX
+  * Hebrew - @elig0n
+  * Interlingua - @softinterlingua
+  * Odia - @SubhamJena
+  * Persian - @Monirzadeh
+  * Spanish - gallegonovato
+  * Swedish - @bittin
+  * Turkish - @oersen
+  * Ukrainian - Сергій
+  * Vietnamese - @ngocanhtve
+
 ### 13.6.3 (2023-11-25)
 
 * Revert "Preserve modification times on initial sync" [#2460](https://github.com/tasks/tasks/issues/2640)
