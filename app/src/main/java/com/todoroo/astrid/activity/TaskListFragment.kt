@@ -250,7 +250,7 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         requireActivity().onBackPressedDispatcher.addCallback(requireActivity(), onBackPressed)
     }
 
@@ -676,7 +676,7 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
     }
 
     override fun onMenuItemActionExpand(item: MenuItem): Boolean {
-        onBackPressed.isEnabled = true    
+        onBackPressed.isEnabled = true
         search.setOnQueryTextListener(this)
         listViewModel.setSearchQuery("")
         if (preferences.isTopAppBar) {
@@ -686,7 +686,7 @@ class TaskListFragment : Fragment(), OnRefreshListener, Toolbar.OnMenuItemClickL
     }
 
     override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
-        onBackPressed.isEnabled = false    
+        onBackPressed.isEnabled = false
         search.setOnQueryTextListener(null)
         listViewModel.setFilter(filter)
         listViewModel.setSearchQuery(null)
