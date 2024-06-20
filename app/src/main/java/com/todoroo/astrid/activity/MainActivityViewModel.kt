@@ -8,13 +8,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.todoroo.astrid.activity.MainActivity.Companion.LOAD_FILTER
 import com.todoroo.astrid.activity.MainActivity.Companion.OPEN_FILTER
-import com.todoroo.astrid.api.CaldavFilter
 import com.todoroo.astrid.api.CustomFilter
-import com.todoroo.astrid.api.Filter
-import com.todoroo.astrid.api.Filter.Companion.NO_COUNT
-import com.todoroo.astrid.api.GtasksFilter
-import com.todoroo.astrid.api.TagFilter
-import com.todoroo.astrid.data.Task
+import org.tasks.filters.GtasksFilter
+import org.tasks.filters.TagFilter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -30,8 +26,13 @@ import org.tasks.R
 import org.tasks.Tasks.Companion.IS_GENERIC
 import org.tasks.billing.Inventory
 import org.tasks.compose.drawer.DrawerItem
-import org.tasks.data.CaldavDao
-import org.tasks.data.TaskDao
+import org.tasks.data.NO_COUNT
+import org.tasks.data.count
+import org.tasks.data.dao.CaldavDao
+import org.tasks.data.dao.TaskDao
+import org.tasks.data.entity.Task
+import org.tasks.filters.CaldavFilter
+import org.tasks.filters.Filter
 import org.tasks.filters.FilterProvider
 import org.tasks.filters.NavigationDrawerSubheader
 import org.tasks.filters.PlaceFilter
@@ -61,6 +62,8 @@ class MainActivityViewModel @Inject constructor(
         val task: Task? = null,
         val drawerOpen: Boolean = false,
         val drawerItems: ImmutableList<DrawerItem> = persistentListOf(),
+        val searchItems: ImmutableList<DrawerItem> = persistentListOf(),
+        val menuQuery: String = "",
     )
 
     private val _state = MutableStateFlow(
@@ -84,10 +87,17 @@ class MainActivityViewModel @Inject constructor(
         }
     }
 
+    suspend fun resetFilter() {
+        setFilter(defaultFilterProvider.getDefaultOpenFilter())
+    }
+
     fun setFilter(
         filter: Filter,
         task: Task? = null,
     ) {
+        if (filter == _state.value.filter && task == null) {
+            return
+        }
         _state.update {
             it.copy(
                 filter = filter,
@@ -99,7 +109,12 @@ class MainActivityViewModel @Inject constructor(
     }
 
     fun setDrawerOpen(open: Boolean) {
-        _state.update { it.copy(drawerOpen = open) }
+        _state.update {
+            it.copy(
+                drawerOpen = open,
+                menuQuery = if (!open) "" else it.menuQuery,
+            )
+        }
     }
 
     init {
@@ -137,13 +152,34 @@ class MainActivityViewModel @Inject constructor(
                             title = item.title ?: "",
                             collapsed = item.isCollapsed,
                             hasError = item.error,
-                            canAdd = item.addIntent != null,
+                            canAdd = item.addIntentRc != 0,
                             type = { item },
                         )
                     else -> throw IllegalArgumentException()
                 }
             }
             .let { filters -> _state.update { it.copy(drawerItems = filters.toPersistentList()) } }
+        val query = _state.value.menuQuery
+        filterProvider
+            .allFilters()
+            .filter { it.title!!.contains(query, ignoreCase = true) }
+            .map { item ->
+                DrawerItem.Filter(
+                    title = item.title ?: "",
+                    icon = getIcon(item),
+                    color = getColor(item),
+                    count = item.count.takeIf { it != NO_COUNT } ?: try {
+                        taskDao.count(item)
+                    } catch (e: Exception) {
+                        Timber.e(e)
+                        0
+                    },
+                    selected = item.areItemsTheSame(selected),
+                    shareCount = if (item is CaldavFilter) item.principals else 0,
+                    type = { item },
+                )
+            }
+            .let { filters -> _state.update { it.copy(searchItems = filters.toPersistentList()) } }
     }
 
     private fun getColor(filter: Filter): Int {
@@ -193,5 +229,10 @@ class MainActivityViewModel @Inject constructor(
 
     fun setTask(task: Task?) {
         _state.update { it.copy(task = task) }
+    }
+
+    fun queryMenu(query: String) {
+        _state.update { it.copy(menuQuery = query) }
+        updateFilters()
     }
 }

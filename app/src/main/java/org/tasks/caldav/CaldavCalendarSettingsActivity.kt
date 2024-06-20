@@ -2,30 +2,31 @@ package org.tasks.caldav
 
 import android.os.Bundle
 import androidx.activity.viewModels
-import androidx.compose.material.FloatingActionButton
-import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.painterResource
 import androidx.core.view.isVisible
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.composethemeadapter.MdcTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.tasks.R
 import org.tasks.compose.ListSettingsComposables.PrincipalList
 import org.tasks.compose.ShareInvite.ShareInviteDialog
-import org.tasks.data.CaldavAccount
-import org.tasks.data.CaldavAccount.Companion.SERVER_NEXTCLOUD
-import org.tasks.data.CaldavAccount.Companion.SERVER_OWNCLOUD
-import org.tasks.data.CaldavAccount.Companion.SERVER_SABREDAV
-import org.tasks.data.CaldavAccount.Companion.SERVER_TASKS
-import org.tasks.data.CaldavCalendar
-import org.tasks.data.CaldavCalendar.Companion.ACCESS_OWNER
-import org.tasks.data.PrincipalDao
 import org.tasks.data.PrincipalWithAccess
+import org.tasks.data.dao.PrincipalDao
+import org.tasks.data.entity.CaldavAccount
+import org.tasks.data.entity.CaldavAccount.Companion.SERVER_NEXTCLOUD
+import org.tasks.data.entity.CaldavAccount.Companion.SERVER_OWNCLOUD
+import org.tasks.data.entity.CaldavAccount.Companion.SERVER_SABREDAV
+import org.tasks.data.entity.CaldavAccount.Companion.SERVER_TASKS
+import org.tasks.data.entity.CaldavCalendar
+import org.tasks.data.entity.CaldavCalendar.Companion.ACCESS_OWNER
+import org.tasks.themes.TasksTheme
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -51,21 +52,21 @@ class CaldavCalendarSettingsActivity : BaseCaldavCalendarSettingsActivity() {
         }
 
         caldavCalendar?.takeIf { it.id > 0 }?.let {
-            principalDao.getPrincipals(it.id).observe(this) {
-                findViewById<ComposeView>(R.id.people)
-                    .apply { isVisible = it.isNotEmpty() }
-                    .setContent {
-                        MdcTheme {
-                            PrincipalList(it, if (canRemovePrincipals) this::onRemove else null)
-                        }
-                    }
+            findViewById<ComposeView>(R.id.people).setContent {
+                TasksTheme {
+                    val principals = principalDao.getPrincipals(it.id).collectAsStateWithLifecycle(initialValue = emptyList()).value
+                    PrincipalList(
+                        principals = principals,
+                        onRemove = if (canRemovePrincipals) { { onRemove(it) } } else null,
+                    )
+                }
             }
         }
         if (caldavAccount.canShare && (isNew || caldavCalendar?.access == ACCESS_OWNER)) {
             findViewById<ComposeView>(R.id.fab)
                 .apply { isVisible = true }
                 .setContent {
-                    MdcTheme {
+                    TasksTheme {
                         val openDialog = rememberSaveable { mutableStateOf(false) }
                         ShareInviteDialog(
                             openDialog,
@@ -76,11 +77,14 @@ class CaldavCalendarSettingsActivity : BaseCaldavCalendarSettingsActivity() {
                                 openDialog.value = false
                             }
                         }
-                        FloatingActionButton(onClick = { openDialog.value = true }) {
+                        FloatingActionButton(
+                            onClick = { openDialog.value = true },
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_outline_person_add_24),
                                 contentDescription = null,
-                                tint = MaterialTheme.colors.onPrimary,
+                                tint = MaterialTheme.colorScheme.onPrimary,
                             )
                         }
                     }
@@ -116,10 +120,10 @@ class CaldavCalendarSettingsActivity : BaseCaldavCalendarSettingsActivity() {
     }
 
     override suspend fun updateNameAndColor(
-            account: CaldavAccount,
-            calendar: CaldavCalendar,
-            name: String,
-            color: Int
+        account: CaldavAccount,
+        calendar: CaldavCalendar,
+        name: String,
+        color: Int
     ) {
         viewModel.updateCalendar(account, calendar, name, color, selectedIcon)
     }

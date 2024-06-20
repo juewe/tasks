@@ -1,32 +1,31 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("com.android.application")
+    alias(libs.plugins.android.application)
     id("com.google.gms.google-services")
     id("com.google.firebase.crashlytics")
     kotlin("android")
     id("dagger.hilt.android.plugin")
     id("com.google.android.gms.oss-licenses-plugin")
-    id("kotlin-parcelize")
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.kotlin.parcelize)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.kotlin.compose.compiler)
 }
 
-repositories {
-    mavenCentral()
-    google()
-    maven {
-        url = uri("https://jitpack.io")
-        content {
-            includeGroup("com.github.tasks")
-            includeModule("com.github.bitfireAT", "cert4android")
-            includeModule("com.github.bitfireAT", "dav4jvm")
-            includeModule("com.github.tasks.opentasks", "opentasks-provider")
-            includeModule("com.github.QuadFlask", "colorpicker")
-            includeModule("com.github.twofortyfouram", "android-plugin-api-for-locale")
-            includeModule("com.github.franmontiel", "PersistentCookieJar")
-        }
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        val composeReports = project.properties["composeMetrics"] ?: project.buildDir.absolutePath
+        freeCompilerArgs = listOf(
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${composeReports}/compose-metrics",
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${composeReports}/compose-metrics",
+        )
     }
 }
 
@@ -50,21 +49,16 @@ android {
         textReport = true
     }
 
-    compileSdk = 34
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
         testApplicationId = "org.tasks.test"
         applicationId = "org.tasks"
-        versionCode = 130804
-        versionName = "13.8.1"
-        targetSdk = 33
-        minSdk = 24
+        versionCode = 131003
+        versionName = "13.10"
+        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
         testInstrumentationRunner = "org.tasks.TestRunner"
-
-        ksp {
-            arg("room.schemaLocation", "$projectDir/schemas")
-            arg("room.incremental", "true")
-        }
     }
 
     signingConfigs {
@@ -87,20 +81,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.compose.compiler.get()
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
-        val composeReports = project.properties["composeMetrics"] ?: project.buildDir.absolutePath
-        freeCompilerArgs = listOf(
-            "-P",
-            "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${composeReports}/compose-metrics",
-            "-P",
-            "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${composeReports}/compose-metrics",
-        )
-    }
     flavorDimensions += listOf("store")
 
     @Suppress("LocalVariableName")
@@ -139,9 +119,9 @@ android {
             dimension = "store"
         }
     }
-    packagingOptions {
+    packaging {
         resources {
-            excludes += setOf("META-INF/*.kotlin_module")
+            excludes += setOf("META-INF/*.kotlin_module", "META-INF/INDEX.LIST")
         }
     }
 
@@ -174,7 +154,8 @@ val genericImplementation by configurations
 val googleplayImplementation by configurations
 
 dependencies {
-    implementation("androidx.core:core-ktx:+")
+    implementation(projects.data)
+    implementation(projects.kmp)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.bitfire.dav4jvm) {
         exclude(group = "junit")
@@ -201,9 +182,10 @@ dependencies {
 
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.lifecycle.runtime)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.room)
-    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.sqlite)
     implementation(libs.androidx.appcompat)
     implementation(libs.markwon)
     implementation(libs.markwon.editor)
@@ -220,10 +202,10 @@ dependencies {
     debugImplementation(libs.kotlin.reflect)
 
     implementation(libs.kotlin.jdk8)
-    implementation(libs.kotlin.immutable)
+    implementation(libs.kotlinx.immutable)
+    implementation(libs.kotlinx.serialization)
     implementation(libs.okhttp)
     implementation(libs.persistent.cookiejar)
-    implementation(libs.gson)
     implementation(libs.material)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.constraintlayout)
@@ -255,7 +237,6 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material")
     implementation("androidx.compose.runtime:runtime-livedata")
-    implementation(libs.compose.theme.adapter)
     implementation(libs.androidx.activity.compose)
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -279,8 +260,7 @@ dependencies {
     googleplayImplementation(libs.play.services.location)
     googleplayImplementation(libs.play.services.maps)
     googleplayImplementation(libs.play.billing.ktx)
-    googleplayImplementation(libs.play.core)
-    googleplayImplementation(libs.play.core.ktx)
+    googleplayImplementation(libs.play.review)
     googleplayImplementation(libs.play.services.oss.licenses)
 
     androidTestImplementation(libs.dagger.hilt.testing)

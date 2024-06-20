@@ -13,17 +13,18 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.api.services.tasks.model.TaskList
 import com.todoroo.astrid.activity.MainActivity
 import com.todoroo.astrid.activity.TaskListFragment
-import com.todoroo.astrid.api.GtasksFilter
+import org.tasks.filters.GtasksFilter
 import com.todoroo.astrid.service.TaskDeleter
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.tasks.LocalBroadcastManager
 import org.tasks.R
 import org.tasks.Strings.isNullOrEmpty
-import org.tasks.data.CaldavAccount
-import org.tasks.data.CaldavCalendar
-import org.tasks.data.GoogleTaskListDao
+import org.tasks.data.entity.CaldavAccount
+import org.tasks.data.entity.CaldavCalendar
+import org.tasks.data.dao.GoogleTaskListDao
 import org.tasks.databinding.ActivityGoogleTaskListSettingsBinding
 import org.tasks.extensions.Context.hideKeyboard
 import org.tasks.extensions.Context.toast
@@ -35,6 +36,7 @@ import javax.inject.Inject
 class GoogleTaskListSettingsActivity : BaseListSettingsActivity() {
     @Inject lateinit var googleTaskListDao: GoogleTaskListDao
     @Inject lateinit var taskDeleter: TaskDeleter
+    @Inject lateinit var localBroadcastManager: LocalBroadcastManager
 
     private lateinit var name: TextInputEditText
     private lateinit var progressView: ProgressBar
@@ -115,6 +117,7 @@ class GoogleTaskListSettingsActivity : BaseListSettingsActivity() {
                     gtasksList.color = selectedColor
                     gtasksList.setIcon(selectedIcon)
                     googleTaskListDao.insertOrReplace(gtasksList)
+                    localBroadcastManager.broadcastRefresh()
                     setResult(
                             Activity.RESULT_OK,
                             Intent(TaskListFragment.ACTION_RELOAD)

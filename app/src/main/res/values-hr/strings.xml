@@ -157,7 +157,6 @@
     <string name="not_signed_in">Nisi prijavljen/a</string>
     <string name="contact_developer">Kontaktiraj programera</string>
     <string name="hide_unused_places">Sakrij nekorištena mjesta</string>
-    <string name="manage_drawer">Upravljaj ladicom</string>
     <string name="place_settings">Postavke mjesta</string>
     <string name="places">Mjesta</string>
     <string name="desaturate_colors_summary_off">Boje neće biti nezasićene u tamnim temama</string>
@@ -748,4 +747,14 @@
     <string name="change_priority">Promijeni prioritet</string>
     <string name="clear_completed_tasks_count">%s će se izbrisati</string>
     <string name="theme_dynamic">Dinamično</string>
+    <string name="swipe_to_snooze_title">Povuci za odgađanje</string>
+    <string name="swipe_to_snooze_time_1_hour">nakon jednog sata</string>
+    <string name="swipe_to_snooze_time_24_hours">nakon 24 sata</string>
+    <string name="show_edit_screen_without_unlock">Prikaži ekran za uređivanje bez otključavanja</string>
+    <string name="show_edit_screen_without_unlock_summary">Omogućuje korištenje ploče „Brze postavke” bez otključavanja uređaja</string>
+    <string name="swipe_to_snooze_description">Vrijeme odgađanja</string>
+    <string name="swipe_to_snooze_time_description">Izbrisana obavijest će se odgoditi i ponovo stvoriti %s</string>
+    <string name="swipe_to_snooze_time_immediately">odmah</string>
+    <string name="swipe_to_snooze_time_15_minutes">nakon 15 minuta</string>
+    <string name="swipe_to_snooze_time_30_minutes">nakon 30 minuta</string>
 </resources>

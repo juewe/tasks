@@ -615,7 +615,6 @@
     <string name="remove_user_confirmation">%1$s, artık %2$s erişimini yitirecek</string>
     <string name="remove_user">Kullanıcıyı kaldır\?</string>
     <string name="list_members">Üyeleri listele</string>
-    <string name="manage_drawer">Çekmeceyi yönet</string>
     <string name="invite_invalid">Davet geçersiz</string>
     <string name="invite_awaiting_response">Davet yanıt bekliyor</string>
     <string name="invite_declined">Davet reddedildi</string>
@@ -726,4 +725,16 @@
     <string name="change_priority">Önceliği değiştir</string>
     <string name="clear_completed_tasks_count">%s silinecek</string>
     <string name="theme_dynamic">Dinamik</string>
+    <string name="swipe_to_snooze_time_immediately">hemen</string>
+    <string name="swipe_to_snooze_time_30_minutes">30 dakika sonra</string>
+    <string name="swipe_to_snooze_time_1_hour">1 saat sonra</string>
+    <string name="swipe_to_snooze_title">Ertelemek için kaydır</string>
+    <string name="swipe_to_snooze_description">Erteleme zamanı</string>
+    <string name="swipe_to_snooze_time_description">Temizlenen bir bildirim ertelenecek ve %s yeniden oluşturulacak</string>
+    <string name="swipe_to_snooze_time_15_minutes">15 dakika sonra</string>
+    <string name="swipe_to_snooze_time_24_hours">24 saat sonra</string>
+    <string name="show_edit_screen_without_unlock">Kilidi açmadan düzenleme ekranını göster</string>
+    <string name="show_edit_screen_without_unlock_summary">Aygıtın kilidini açmadan Hızlı Ayarlar kutucuğunun kullanılmasını sağlar</string>
+    <string name="customize_drawer">Çekmeceyi özelleştir</string>
+    <string name="customize_drawer_summary">Menü ögelerini yeniden düzenlemek için sürükleyip bırakın</string>
 </resources>

@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.andlib.utility.DateUtilities.now
 import com.todoroo.astrid.activity.MainActivity
@@ -31,13 +30,22 @@ import org.tasks.compose.FilterChip
 import org.tasks.compose.StartDateChip
 import org.tasks.compose.SubtaskChip
 import org.tasks.data.TaskContainer
+import org.tasks.data.hasNotes
+import org.tasks.data.isHidden
+import org.tasks.data.isOverdue
 import org.tasks.databinding.TaskAdapterRowBinding
 import org.tasks.date.DateTimeUtils.newDateTime
 import org.tasks.dialogs.Linkify
+import org.tasks.filters.CaldavFilter
+import org.tasks.filters.Filter
+import org.tasks.filters.GtasksFilter
 import org.tasks.filters.PlaceFilter
+import org.tasks.filters.TagFilter
 import org.tasks.markdown.Markdown
 import org.tasks.preferences.Preferences
-import org.tasks.time.DateTimeUtils.startOfDay
+import org.tasks.themes.TasksTheme
+import org.tasks.time.DateTimeUtils2.currentTimeMillis
+import org.tasks.time.startOfDay
 import org.tasks.ui.CheckBoxProvider
 import org.tasks.ui.ChipProvider
 import java.time.format.FormatStyle
@@ -130,7 +138,7 @@ class TaskViewHolder internal constructor(
             v.setPaddingRelative(v.paddingStart, v.paddingTop, v.paddingEnd, padding)
         }
     }
-    
+
     private fun updateBackground() {
         if (selected || moving) {
             rowBody.setBackgroundColor(selectedColor)
@@ -168,7 +176,7 @@ class TaskViewHolder internal constructor(
         } else
         if (preferences.getBoolean(R.string.p_show_description, true)) {
             markdown.setMarkdown(description, task.notes)
-            description.visibility = if (task.hasNotes()) View.VISIBLE else View.GONE
+            description.visibility = if (task.task.hasNotes()) View.VISIBLE else View.GONE
         }
         if (markdown.enabled || preferences.getBoolean(R.string.p_linkify_task_list, false)) {
             linkify.setMovementMethod(
@@ -208,7 +216,7 @@ class TaskViewHolder internal constructor(
             nameView.paintFlags = nameView.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
         } else {
             nameView.setTextColor(
-                    context.getColor(if (task.isHidden) R.color.text_tertiary else R.color.text_primary))
+                    context.getColor(if (task.task.isHidden) R.color.text_tertiary else R.color.text_primary))
             nameView.paintFlags = nameView.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
         }
         completeBox.isChecked = task.isCompleted
@@ -218,13 +226,13 @@ class TaskViewHolder internal constructor(
 
     private fun setupDueDate(sortByDueDate: Boolean) {
         if (task.hasDueDate()) {
-            if (task.isOverdue) {
+            if (task.task.isOverdue) {
                 dueDate.setTextColor(textColorOverdue)
             } else {
                 dueDate.setTextColor(textColorSecondary)
             }
             val dateValue: String? = if (sortByDueDate
-                    && (task.sortGroup ?: 0) >= now().startOfDay()
+                    && (task.sortGroup ?: 0) >= currentTimeMillis().startOfDay()
             ) {
                 task.takeIf { it.hasDueTime() }?.let {
                     DateUtilities.getTimeString(context, newDateTime(task.dueDate))
@@ -243,7 +251,7 @@ class TaskViewHolder internal constructor(
         val id = task.id
         val children = task.children
         val collapsed = task.isCollapsed
-        val isHidden = task.isHidden
+        val isHidden = task.task.isHidden
         val sortGroup = task.sortGroup
         val startDate = task.task.hideUntil
         val place = task.location?.place
@@ -257,7 +265,7 @@ class TaskViewHolder internal constructor(
         val toggleSubtasks = { task: Long, collapsed: Boolean -> callback.toggleSubtasks(task, collapsed) }
         val onClick = { it: Filter -> callback.onClick(it) }
         chipGroup.setContent {
-            MdcTheme {
+            TasksTheme {
                 ChipGroup(
                     modifier = Modifier.padding(
                         end = 16.dp,

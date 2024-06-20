@@ -1,11 +1,13 @@
 package com.todoroo.astrid.api
 
 import kotlinx.parcelize.Parcelize
+import org.tasks.filters.Filter
+import org.tasks.filters.FilterListItem
 import org.tasks.themes.CustomIcons
 
 @Parcelize
 data class CustomFilter(
-    val filter: org.tasks.data.Filter,
+    val filter: org.tasks.data.entity.Filter,
 ) : Filter {
     override val title: String?
         get() = filter.title

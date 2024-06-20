@@ -4,20 +4,21 @@ import android.content.Context
 import android.widget.RemoteViews
 import androidx.annotation.ColorInt
 import com.todoroo.andlib.utility.DateUtilities
-import com.todoroo.astrid.api.CaldavFilter
-import com.todoroo.astrid.api.Filter
-import com.todoroo.astrid.api.GtasksFilter
-import com.todoroo.astrid.api.TagFilter
-import com.todoroo.astrid.data.Task
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tasks.BuildConfig
 import org.tasks.R
 import org.tasks.data.TaskContainer
+import org.tasks.data.entity.Task
+import org.tasks.data.isHidden
 import org.tasks.date.DateTimeUtils.toDateTime
 import org.tasks.extensions.setColorFilter
+import org.tasks.filters.CaldavFilter
+import org.tasks.filters.Filter
+import org.tasks.filters.GtasksFilter
 import org.tasks.filters.PlaceFilter
+import org.tasks.filters.TagFilter
 import org.tasks.themes.CustomIcons
-import org.tasks.time.DateTimeUtils.startOfDay
+import org.tasks.time.startOfDay
 import org.tasks.ui.ChipListCache
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -50,7 +51,7 @@ class WidgetChipProvider @Inject constructor(
     }
 
     fun getStartDateChip(task: TaskContainer, showFullDate: Boolean, sortByStartDate: Boolean): RemoteViews? {
-        return if (task.isHidden) {
+        return if (task.task.isHidden) {
             val time = if (sortByStartDate && task.sortGroup?.startOfDay() == task.task.hideUntil.startOfDay()) {
                 task.task.hideUntil
                     .takeIf { Task.hasDueTime(it) }

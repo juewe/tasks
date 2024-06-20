@@ -7,13 +7,12 @@ import android.os.Bundle
 import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.andlib.utility.DateUtilities.getTimeString
 import dagger.hilt.android.AndroidEntryPoint
 import org.tasks.R
-import org.tasks.compose.collectAsStateLifecycleAware
 import org.tasks.compose.edit.StartDateRow
 import org.tasks.date.DateTimeUtils.newDateTime
 import org.tasks.dialogs.StartDatePicker
@@ -22,9 +21,10 @@ import org.tasks.dialogs.StartDatePicker.Companion.EXTRA_TIME
 import org.tasks.dialogs.StartDatePicker.Companion.NO_DAY
 import org.tasks.dialogs.StartDatePicker.Companion.NO_TIME
 import org.tasks.preferences.Preferences
+import org.tasks.themes.TasksTheme
 import org.tasks.ui.TaskEditControlFragment
 import java.time.format.FormatStyle
-import java.util.*
+import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -48,17 +48,17 @@ class StartDateControlSet : TaskEditControlFragment() {
     override fun bind(parent: ViewGroup?) =
         (parent as ComposeView).apply {
             setContent {
-                MdcTheme {
-                    val selectedDay = vm.selectedDay.collectAsStateLifecycleAware().value
-                    val selectedTime = vm.selectedTime.collectAsStateLifecycleAware().value
+                TasksTheme {
+                    val selectedDay = vm.selectedDay.collectAsStateWithLifecycle().value
+                    val selectedTime = vm.selectedTime.collectAsStateWithLifecycle().value
                     StartDateRow(
-                        startDate = viewModel.startDate.collectAsStateLifecycleAware().value,
+                        startDate = viewModel.startDate.collectAsStateWithLifecycle().value,
                         selectedDay = selectedDay,
                         selectedTime = selectedTime,
-                        hasDueDate = viewModel.dueDate.collectAsStateLifecycleAware().value > 0,
+                        hasDueDate = viewModel.dueDate.collectAsStateWithLifecycle().value > 0,
                         printDate = {
                             DateUtilities.getRelativeDateTime(
-                                context,
+                                requireContext(),
                                 selectedDay + selectedTime,
                                 locale,
                                 FormatStyle.FULL,

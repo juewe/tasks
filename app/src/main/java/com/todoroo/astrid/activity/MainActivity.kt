@@ -8,54 +8,61 @@ package com.todoroo.astrid.activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.mandatorySystemGestures
 import androidx.core.content.IntentCompat.getParcelableExtra
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.utility.AndroidUtilities
+import com.todoroo.astrid.activity.TaskEditFragment.Companion.newTaskEditFragment
 import com.todoroo.astrid.adapter.SubheaderClickHandler
-import com.todoroo.astrid.api.Filter
 import com.todoroo.astrid.dao.TaskDao
-import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.service.TaskCreator
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.tasks.BuildConfig
 import org.tasks.R
+import org.tasks.activities.GoogleTaskListSettingsActivity
+import org.tasks.activities.TagSettingsActivity
 import org.tasks.analytics.Firebase
 import org.tasks.billing.Inventory
-import org.tasks.compose.collectAsStateLifecycleAware
+import org.tasks.caldav.BaseCaldavCalendarSettingsActivity
 import org.tasks.compose.drawer.TasksMenu
-import org.tasks.data.AlarmDao
-import org.tasks.data.LocationDao
-import org.tasks.data.Place
-import org.tasks.data.TagDataDao
+import org.tasks.data.dao.AlarmDao
+import org.tasks.data.dao.CaldavDao
+import org.tasks.data.dao.LocationDao
+import org.tasks.data.dao.TagDataDao
+import org.tasks.data.entity.Place
+import org.tasks.data.entity.Task
+import org.tasks.data.getLocation
+import org.tasks.data.listSettingsClass
 import org.tasks.databinding.TaskListActivityBinding
 import org.tasks.dialogs.NewFilterDialog
 import org.tasks.dialogs.WhatsNewDialog
 import org.tasks.extensions.Context.nightMode
 import org.tasks.extensions.hideKeyboard
+import org.tasks.filters.Filter
 import org.tasks.filters.FilterProvider
+import org.tasks.filters.NavigationDrawerSubheader
 import org.tasks.filters.PlaceFilter
-import org.tasks.intents.TaskIntents.getTaskListIntent
 import org.tasks.location.LocationPickerActivity
 import org.tasks.location.LocationPickerActivity.Companion.EXTRA_PLACE
 import org.tasks.preferences.DefaultFilterProvider
 import org.tasks.preferences.Preferences
 import org.tasks.themes.ColorProvider
+import org.tasks.themes.TasksTheme
 import org.tasks.themes.Theme
 import org.tasks.ui.EmptyTaskEditFragment.Companion.newEmptyTaskEditFragment
 import org.tasks.ui.MainActivityEvent
@@ -77,19 +84,13 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var alarmDao: AlarmDao
     @Inject lateinit var eventBus: MainActivityEventBus
     @Inject lateinit var firebase: Firebase
+    @Inject lateinit var caldavDao: CaldavDao
 
     private val viewModel: MainActivityViewModel by viewModels()
     private var currentNightMode = 0
     private var currentPro = false
     private var actionMode: ActionMode? = null
     private lateinit var binding: TaskListActivityBinding
-
-    public var isCompletedHeader = false;
-
-    private val settingsRequest =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            recreate()
-        }
 
     /** @see android.app.Activity.onCreate
      */
@@ -104,31 +105,58 @@ class MainActivity : AppCompatActivity() {
         handleIntent()
 
         binding.composeView.setContent {
-            val state = viewModel.state.collectAsStateLifecycleAware().value
+            val state = viewModel.state.collectAsStateWithLifecycle().value
             if (state.drawerOpen) {
-                MdcTheme {
+                TasksTheme {
                     TasksMenu(
-                        bottomPadding = WindowInsets.mandatorySystemGestures
-                            .asPaddingValues()
-                            .calculateBottomPadding(),
-                        items = state.drawerItems,
+                        items = if (state.menuQuery.isNotEmpty()) state.searchItems else state.drawerItems,
                         begForMoney = state.begForMoney,
                         isTopAppBar = preferences.isTopAppBar,
                         setFilter = { viewModel.setFilter(it) },
                         toggleCollapsed = { viewModel.toggleCollapsed(it) },
                         addFilter = {
-                            val rc = it.addIntentRc
-                            if (rc == FilterProvider.REQUEST_NEW_FILTER) {
-                                NewFilterDialog.newFilterDialog().show(
-                                    supportFragmentManager,
-                                    SubheaderClickHandler.FRAG_TAG_NEW_FILTER
-                                )
-                            } else {
-                                val intent = it.addIntent ?: return@TasksMenu
-                                startActivityForResult(intent, rc)
+                            when (it.addIntentRc) {
+                                FilterProvider.REQUEST_NEW_FILTER ->
+                                    NewFilterDialog.newFilterDialog().show(
+                                        supportFragmentManager,
+                                        SubheaderClickHandler.FRAG_TAG_NEW_FILTER
+                                    )
+                                REQUEST_NEW_PLACE ->
+                                    startActivityForResult(
+                                        Intent(this, LocationPickerActivity::class.java),
+                                        REQUEST_NEW_PLACE
+                                    )
+                                REQUEST_NEW_TAGS ->
+                                    startActivityForResult(
+                                        Intent(this, TagSettingsActivity::class.java),
+                                        REQUEST_NEW_LIST
+                                    )
+                                REQUEST_NEW_LIST -> lifecycleScope.launch {
+                                    val account = caldavDao.getAccount(it.id) ?: return@launch
+                                    when (it.subheaderType) {
+                                        NavigationDrawerSubheader.SubheaderType.GOOGLE_TASKS ->
+                                            startActivityForResult(
+                                                Intent(this@MainActivity, GoogleTaskListSettingsActivity::class.java)
+                                                    .putExtra(GoogleTaskListSettingsActivity.EXTRA_ACCOUNT, account),
+                                                REQUEST_NEW_LIST
+                                            )
+                                        NavigationDrawerSubheader.SubheaderType.CALDAV,
+                                        NavigationDrawerSubheader.SubheaderType.TASKS,
+                                        NavigationDrawerSubheader.SubheaderType.ETESYNC ->
+                                            startActivityForResult(
+                                                Intent(this@MainActivity, account.listSettingsClass())
+                                                    .putExtra(BaseCaldavCalendarSettingsActivity.EXTRA_CALDAV_ACCOUNT, account),
+                                                REQUEST_NEW_LIST
+                                            )
+                                        else -> {}
+                                    }
+                                }
+                                else -> Timber.e("Unhandled request code: $it")
                             }
                         },
                         dismiss = { viewModel.setDrawerOpen(false) },
+                        query = state.menuQuery,
+                        onQueryChange = { viewModel.queryMenu(it) },
                     )
                 }
             }
@@ -269,7 +297,7 @@ class MainActivity : AppCompatActivity() {
     private fun logIntent(caller: String) {
         if (BuildConfig.DEBUG) {
             Timber.d("""
-                $caller            
+                $caller
                 **********
                 broughtToFront: ${intent.broughtToFront}
                 isFromHistory: ${intent.isFromHistory}
@@ -287,7 +315,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val filter = intent.getFilter
                 ?: intent.getFilterString?.let { defaultFilterProvider.getFilterFromPreference(it) }
-                ?: defaultFilterProvider.getStartupFilter()
+                ?: viewModel.state.value.filter
             val task = getTaskToLoad(filter)
             viewModel.setFilter(filter = filter, task = task)
         }
@@ -323,10 +351,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun newTaskEditFragment(task: Task): TaskEditFragment {
+    private suspend fun newTaskEditFragment(task: Task): TaskEditFragment {
         AndroidUtilities.assertMainThread()
         clearUi()
-        return TaskEditFragment.newTaskEditFragment(task)
+        return coroutineScope {
+            withContext(Dispatchers.Default) {
+                val freshTask = async { if (task.isNew) task else taskDao.fetch(task.id) ?: task }
+                val list = async { defaultFilterProvider.getList(task) }
+                val location = async { locationDao.getLocation(task, preferences) }
+                val tags = async { tagDataDao.getTags(task) }
+                val alarms = async { alarmDao.getAlarms(task) }
+                newTaskEditFragment(
+                    freshTask.await(),
+                    list.await(),
+                    location.await(),
+                    tags.await(),
+                    alarms.await(),
+                )
+            }
+        }
     }
 
     private val isSinglePaneLayout: Boolean
@@ -352,6 +395,7 @@ class MainActivity : AppCompatActivity() {
         private const val FLAG_FROM_HISTORY
                 = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY
         const val REQUEST_NEW_LIST = 10100
+        const val REQUEST_NEW_TAGS = 10101
         const val REQUEST_NEW_PLACE = 10104
 
         val Intent.getFilter: Filter?

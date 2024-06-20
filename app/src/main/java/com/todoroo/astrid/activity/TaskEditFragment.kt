@@ -23,7 +23,7 @@ import androidx.appcompat.widget.Toolbar
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.Divider
+import androidx.compose.material3.Divider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,14 +39,13 @@ import androidx.core.os.BundleCompat
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.AppBarLayout.Behavior.DragCallback
-import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.utility.AndroidUtilities.atLeastOreoMR1
 import com.todoroo.andlib.utility.DateUtilities
 import com.todoroo.astrid.dao.TaskDao
-import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.files.FilesControlSet
 import com.todoroo.astrid.repeats.RepeatControlSet
 import com.todoroo.astrid.tags.TagsControlSet
@@ -63,14 +62,19 @@ import org.tasks.Strings.isNullOrEmpty
 import org.tasks.analytics.Firebase
 import org.tasks.calendars.CalendarPicker
 import org.tasks.compose.BeastModeBanner
-import org.tasks.compose.collectAsStateLifecycleAware
+import org.tasks.compose.FilterSelectionActivity.Companion.launch
+import org.tasks.compose.FilterSelectionActivity.Companion.registerForListPickerResult
 import org.tasks.compose.edit.CommentsRow
 import org.tasks.compose.edit.DescriptionRow
 import org.tasks.compose.edit.DueDateRow
 import org.tasks.compose.edit.InfoRow
 import org.tasks.compose.edit.ListRow
 import org.tasks.compose.edit.PriorityRow
-import org.tasks.data.UserActivityDao
+import org.tasks.data.Location
+import org.tasks.data.dao.UserActivityDao
+import org.tasks.data.entity.Alarm
+import org.tasks.data.entity.TagData
+import org.tasks.data.entity.Task
 import org.tasks.databinding.FragmentTaskEditBinding
 import org.tasks.databinding.TaskEditCalendarBinding
 import org.tasks.databinding.TaskEditFilesBinding
@@ -84,11 +88,10 @@ import org.tasks.databinding.TaskEditTimerBinding
 import org.tasks.date.DateTimeUtils.newDateTime
 import org.tasks.dialogs.DateTimePicker
 import org.tasks.dialogs.DialogBuilder
-import org.tasks.dialogs.FilterPicker.Companion.newFilterPicker
-import org.tasks.dialogs.FilterPicker.Companion.setFilterPickerResultListener
 import org.tasks.dialogs.Linkify
 import org.tasks.extensions.hideKeyboard
 import org.tasks.files.FileHelper
+import org.tasks.filters.Filter
 import org.tasks.fragments.TaskEditControlSetFragmentManager
 import org.tasks.fragments.TaskEditControlSetFragmentManager.Companion.TAG_CREATION
 import org.tasks.fragments.TaskEditControlSetFragmentManager.Companion.TAG_DESCRIPTION
@@ -99,6 +102,7 @@ import org.tasks.markdown.MarkdownProvider
 import org.tasks.notifications.NotificationManager
 import org.tasks.play.PlayServices
 import org.tasks.preferences.Preferences
+import org.tasks.themes.TasksTheme
 import org.tasks.ui.CalendarControlSet
 import org.tasks.ui.ChipProvider
 import org.tasks.ui.LocationControlSet
@@ -136,6 +140,9 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             activity?.recreate()
         }
+    private val listPickerLauncher = registerForListPickerResult { filter ->
+        editViewModel.selectedList.update { filter }
+    }
 
     val task: Task?
         get() = BundleCompat.getParcelable(requireArguments(), EXTRA_TASK, Task::class.java)
@@ -268,7 +275,7 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
             }
         }
         binding.composeView.setContent {
-            MdcTheme {
+            TasksTheme {
                 Column(modifier = Modifier.gesturesDisabled(editViewModel.isReadOnly)) {
                     taskEditControlSetFragmentManager.displayOrder.forEachIndexed { index, tag ->
                         if (index < taskEditControlSetFragmentManager.visibleSize) {
@@ -303,9 +310,6 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
                 }
             }
         }
-        childFragmentManager.setFilterPickerResultListener(this) { filter ->
-            editViewModel.selectedList.update { filter }
-        }
         return view
     }
 
@@ -336,7 +340,7 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
         binding.banner.setContent {
             var visible by rememberSaveable { mutableStateOf(true) }
             val context = LocalContext.current
-            MdcTheme {
+            TasksTheme {
                 BeastModeBanner(
                     visible,
                     showSettings = {
@@ -431,7 +435,7 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
 
     @Composable
     private fun DueDateRow() {
-        val dueDate = editViewModel.dueDate.collectAsStateLifecycleAware().value
+        val dueDate = editViewModel.dueDate.collectAsStateWithLifecycle().value
         DueDateRow(
             dueDate = if (dueDate == 0L) {
                 null
@@ -466,7 +470,7 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
     @Composable
     private fun PriorityRow() {
         PriorityRow(
-            priority = editViewModel.priority.collectAsStateLifecycleAware().value,
+            priority = editViewModel.priority.collectAsStateWithLifecycle().value,
             onChangePriority = { editViewModel.priority.value = it },
             desaturate = preferences.desaturateDarkMode,
         )
@@ -484,16 +488,16 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
 
     @Composable
     private fun ListRow() {
-        val list = editViewModel.selectedList.collectAsStateLifecycleAware().value
+        val list = editViewModel.selectedList.collectAsStateWithLifecycle().value
         ListRow(
             list = list,
             colorProvider = { chipProvider.getColor(it) },
             onClick = {
-                newFilterPicker(list, true)
-                    .show(
-                        childFragmentManager,
-                        FRAG_TAG_GOOGLE_TASK_LIST_SELECTION
-                    )
+                listPickerLauncher.launch(
+                    context = context,
+                    selectedFilter = list,
+                    listsOnly = true
+                )
             }
         )
     }
@@ -513,7 +517,7 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
         CommentsRow(
             comments = userActivityDao
                 .watchComments(editViewModel.task.uuid)
-                .collectAsStateLifecycleAware(emptyList())
+                .collectAsStateWithLifecycle(emptyList())
                 .value,
             deleteComment = {
                 lifecycleScope.launch {
@@ -526,9 +530,11 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
 
     companion object {
         const val EXTRA_TASK = "extra_task"
+        const val EXTRA_LIST = "extra_list"
+        const val EXTRA_LOCATION = "extra_location"
+        const val EXTRA_TAGS = "extra_tags"
+        const val EXTRA_ALARMS = "extra_alarms"
 
-        private const val FRAG_TAG_GOOGLE_TASK_LIST_SELECTION =
-            "frag_tag_google_task_list_selection"
         const val FRAG_TAG_CALENDAR_PICKER = "frag_tag_calendar_picker"
         private const val FRAG_TAG_DATE_PICKER = "frag_tag_date_picker"
         const val REQUEST_CODE_PICK_CALENDAR = 70
@@ -543,10 +549,18 @@ class TaskEditFragment : Fragment(), Toolbar.OnMenuItemClickListener {
 
         fun newTaskEditFragment(
             task: Task,
+            list: Filter,
+            location: Location?,
+            tags: ArrayList<TagData>,
+            alarms: ArrayList<Alarm>,
         ): TaskEditFragment {
             val taskEditFragment = TaskEditFragment()
             val arguments = Bundle()
             arguments.putParcelable(EXTRA_TASK, task)
+            arguments.putParcelable(EXTRA_LIST, list)
+            arguments.putParcelable(EXTRA_LOCATION, location)
+            arguments.putParcelableArrayList(EXTRA_TAGS, tags)
+            arguments.putParcelableArrayList(EXTRA_ALARMS, alarms)
             taskEditFragment.arguments = arguments
             return taskEditFragment
         }

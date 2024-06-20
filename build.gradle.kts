@@ -1,13 +1,13 @@
 plugins {
-    id("com.google.devtools.ksp") version "1.9.22-1.0.18" apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.kotlin.parcelize) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.ksp) apply false
 }
 
 buildscript {
-    repositories {
-        mavenCentral()
-        google()
-    }
-
     dependencies {
         classpath(libs.gradle)
         classpath(libs.google.services)
@@ -19,6 +19,6 @@ buildscript {
 }
 
 tasks.getByName<Wrapper>("wrapper") {
-    gradleVersion = "8.6"
+    gradleVersion = "8.8"
     distributionType = Wrapper.DistributionType.ALL
 }

@@ -7,25 +7,24 @@ package com.todoroo.astrid.core
 
 import android.content.Context
 import android.content.res.Resources
-import com.todoroo.andlib.sql.Criterion.Companion.and
-import com.todoroo.andlib.sql.Criterion.Companion.or
-import com.todoroo.andlib.sql.Join
-import com.todoroo.andlib.sql.QueryTemplate
-import com.todoroo.astrid.api.AstridOrderingFilter
-import com.todoroo.astrid.api.Filter
-import com.todoroo.astrid.api.FilterImpl
-import com.todoroo.astrid.data.Task
-import com.todoroo.astrid.timers.TimerPlugin
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tasks.R
-import org.tasks.data.CaldavAccount
-import org.tasks.data.CaldavCalendar
-import org.tasks.data.CaldavTask
-import org.tasks.data.TaskDao
+import org.tasks.data.dao.TaskDao
+import org.tasks.data.entity.CaldavAccount
+import org.tasks.data.entity.CaldavCalendar
+import org.tasks.data.entity.CaldavTask
+import org.tasks.data.entity.Task
+import org.tasks.data.sql.Criterion.Companion.and
+import org.tasks.data.sql.Criterion.Companion.or
+import org.tasks.data.sql.Join
+import org.tasks.data.sql.QueryTemplate
+import org.tasks.filters.Filter
+import org.tasks.filters.FilterImpl
 import org.tasks.filters.MyTasksFilter
 import org.tasks.filters.NotificationsFilter
 import org.tasks.filters.RecentlyModifiedFilter
 import org.tasks.filters.SnoozedFilter
+import org.tasks.filters.TimerFilter
 import org.tasks.filters.TodayFilter
 import org.tasks.preferences.Preferences
 import javax.inject.Inject
@@ -52,7 +51,7 @@ class BuiltInFilterExposer @Inject constructor(
             filters.add(getSnoozedFilter(r))
         }
         if (taskDao.activeTimers() > 0) {
-            filters.add(TimerPlugin.createFilter(context))
+            filters.add(getTimerFilter(r))
         }
         if (taskDao.hasNotifications() > 0) {
             filters.add(getNotificationsFilter(context))
@@ -143,6 +142,8 @@ class BuiltInFilterExposer @Inject constructor(
             RecentlyModifiedFilter(r.getString(R.string.BFE_Recent))
 
         fun getSnoozedFilter(r: Resources) = SnoozedFilter(r.getString(R.string.filter_snoozed))
+
+        fun getTimerFilter(r: Resources) = TimerFilter(r.getString(R.string.TFE_workingOn))
 
         fun getNotificationsFilter(context: Context) = NotificationsFilter(context.getString(R.string.notifications))
 

@@ -2,9 +2,13 @@ package org.tasks.compose.edit
 
 import android.net.Uri
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -14,8 +18,9 @@ import com.todoroo.andlib.utility.DateUtilities
 import org.tasks.R
 import org.tasks.compose.DeleteButton
 import org.tasks.compose.TaskEditRow
-import org.tasks.data.UserActivity
-import java.util.*
+import org.tasks.data.entity.UserActivity
+import org.tasks.data.pictureUri
+import java.util.Locale
 
 @Composable
 fun CommentsRow(
@@ -57,7 +62,10 @@ fun Comment(
         ) {
             comment.message?.let {
                 // TODO: linkify text
-                Text(text = it)
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
             comment.pictureUri?.let {
                 AsyncImage(
@@ -68,7 +76,8 @@ fun Comment(
             }
             Text(
                 text = DateUtilities.getLongDateStringWithTime(comment.created!!, Locale.getDefault()),
-                style = MaterialTheme.typography.caption,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
         DeleteButton(

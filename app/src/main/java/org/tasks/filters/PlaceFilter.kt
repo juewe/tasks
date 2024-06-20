@@ -1,19 +1,18 @@
 package org.tasks.filters
 
 import android.content.Context
-import com.todoroo.andlib.sql.Criterion.Companion.and
-import com.todoroo.andlib.sql.Field.Companion.field
-import com.todoroo.andlib.sql.Join.Companion.inner
-import com.todoroo.andlib.sql.QueryTemplate
-import com.todoroo.andlib.utility.AndroidUtilities
-import com.todoroo.astrid.api.Filter
-import com.todoroo.astrid.api.Filter.Companion.NO_COUNT
-import com.todoroo.astrid.api.FilterListItem
-import com.todoroo.astrid.data.Task
 import kotlinx.parcelize.Parcelize
-import org.tasks.data.Geofence
-import org.tasks.data.Place
-import org.tasks.data.TaskDao.TaskCriteria.activeAndVisible
+import org.tasks.data.NO_COUNT
+import org.tasks.data.dao.TaskDao.TaskCriteria.activeAndVisible
+import org.tasks.data.displayName
+import org.tasks.data.entity.Geofence
+import org.tasks.data.entity.Place
+import org.tasks.data.entity.Task
+import org.tasks.data.open
+import org.tasks.data.sql.Criterion.Companion.and
+import org.tasks.data.sql.Field.Companion.field
+import org.tasks.data.sql.Join.Companion.inner
+import org.tasks.data.sql.QueryTemplate
 import org.tasks.themes.CustomIcons
 
 @Parcelize
@@ -22,7 +21,7 @@ data class PlaceFilter(
     override val count: Int = NO_COUNT,
 ) : Filter {
     override val valuesForNewTasks: String
-        get() = AndroidUtilities.mapToSerializedString(mapOf(Place.KEY to place.uid!!))
+        get() = mapToSerializedString(mapOf(Place.KEY to place.uid!!))
     override val sql: String
         get() = QueryTemplate()
             .join(inner(G2, Task.ID.eq(G2_TASK)))

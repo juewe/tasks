@@ -16,37 +16,39 @@ import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
-import com.todoroo.andlib.sql.Field
-import com.todoroo.andlib.sql.Query
-import com.todoroo.andlib.sql.UnaryCriterion
-import com.todoroo.andlib.utility.AndroidUtilities
+import org.tasks.data.sql.Field
+import org.tasks.data.sql.Query
+import org.tasks.data.sql.UnaryCriterion
 import com.todoroo.astrid.activity.MainActivity
 import com.todoroo.astrid.activity.TaskListFragment
 import com.todoroo.astrid.api.BooleanCriterion
 import com.todoroo.astrid.api.CustomFilter
 import com.todoroo.astrid.api.CustomFilterCriterion
-import com.todoroo.astrid.api.Filter.Companion.NO_ORDER
 import com.todoroo.astrid.api.MultipleSelectCriterion
 import com.todoroo.astrid.api.PermaSql
 import com.todoroo.astrid.api.TextInputCriterion
 import com.todoroo.astrid.core.CriterionInstance
 import com.todoroo.astrid.core.CustomFilterAdapter
 import com.todoroo.astrid.core.CustomFilterItemTouchHelper
-import com.todoroo.astrid.dao.Database
-import com.todoroo.astrid.data.Task
+import org.tasks.data.db.Database
+import org.tasks.data.entity.Task
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import org.tasks.LocalBroadcastManager
 import org.tasks.R
 import org.tasks.Strings
-import org.tasks.data.Filter
-import org.tasks.data.FilterDao
-import org.tasks.data.TaskDao.TaskCriteria.activeAndVisible
+import org.tasks.data.entity.Filter
+import org.tasks.data.dao.FilterDao
+import org.tasks.data.NO_ORDER
+import org.tasks.data.dao.TaskDao.TaskCriteria.activeAndVisible
+import org.tasks.data.rawQuery
 import org.tasks.databinding.FilterSettingsActivityBinding
 import org.tasks.db.QueryUtils
 import org.tasks.extensions.Context.hideKeyboard
 import org.tasks.extensions.Context.openUri
 import org.tasks.extensions.hideKeyboard
 import org.tasks.filters.FilterCriteriaProvider
+import org.tasks.filters.mapToSerializedString
 import org.tasks.themes.CustomIcons
 import java.util.Locale
 import javax.inject.Inject
@@ -58,6 +60,7 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
     @Inject lateinit var locale: Locale
     @Inject lateinit var database: Database
     @Inject lateinit var filterCriteriaProvider: FilterCriteriaProvider
+    @Inject lateinit var localBroadcastManager: LocalBroadcastManager
 
     private lateinit var name: TextInputEditText
     private lateinit var nameLayout: TextInputLayout
@@ -258,6 +261,7 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
             } else {
                 filterDao.update(f)
             }
+            localBroadcastManager.broadcastRefresh()
             setResult(
                     Activity.RESULT_OK,
                     Intent(TaskListFragment.ACTION_RELOAD)
@@ -317,7 +321,7 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
 
     private fun help() = openUri(R.string.url_filters)
 
-    private fun updateList() {
+    private fun updateList() = lifecycleScope.launch {
         var max = 0
         var last = -1
         val sql = StringBuilder(Query.select(Field.COUNT).from(Task.TABLE).toString())
@@ -333,7 +337,7 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
             if (instance.type == CriterionInstance.TYPE_UNIVERSE || instance.criterion.sql == null) {
                 sql.append(activeAndVisible()).append(' ')
             } else {
-                var subSql: String? = instance.criterion.sql.replace(
+                var subSql: String = instance.criterion.sql.replace(
                     "?",
                     UnaryCriterion.sanitize(instance.valueFromCriterion!!)
                 )
@@ -341,8 +345,8 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
                 sql.append(Task.ID).append(" IN (").append(subSql).append(")")
             }
             val sqlString = QueryUtils.showHiddenAndCompleted(sql.toString())
-            database.query(sqlString, null).use { cursor ->
-                cursor.moveToNext()
+            database.rawQuery(sqlString) { cursor ->
+                cursor.step()
                 instance.start = if (last == -1) cursor.getInt(0) else last
                 instance.end = cursor.getInt(0)
                 last = instance.end
@@ -396,7 +400,7 @@ class FilterSettingsActivity : BaseListSettingsActivity() {
                         }
                     }
                 }
-                return AndroidUtilities.mapToSerializedString(values)
+                return mapToSerializedString(values)
             }
     }
 }

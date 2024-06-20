@@ -3,8 +3,8 @@ package org.tasks.compose.drawer
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,18 +15,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import com.todoroo.astrid.api.Filter
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.tasks.R
 import org.tasks.Tasks
-import org.tasks.activities.NavigationDrawerCustomization
 import org.tasks.billing.PurchaseActivity
 import org.tasks.extensions.Context.findActivity
 import org.tasks.extensions.Context.openUri
+import org.tasks.filters.Filter
 import org.tasks.filters.NavigationDrawerSubheader
 import org.tasks.preferences.HelpAndFeedback
 import org.tasks.preferences.MainPreferences
@@ -34,7 +31,6 @@ import org.tasks.preferences.MainPreferences
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksMenu(
-    bottomPadding: Dp = 0.dp,
     items: ImmutableList<DrawerItem>,
     isTopAppBar: Boolean,
     begForMoney: Boolean,
@@ -42,6 +38,8 @@ fun TasksMenu(
     toggleCollapsed: (NavigationDrawerSubheader) -> Unit,
     addFilter: (NavigationDrawerSubheader) -> Unit,
     dismiss: () -> Unit,
+    query: String,
+    onQueryChange: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val skipPartiallyExpanded = remember(expanded) {
@@ -75,12 +73,11 @@ fun TasksMenu(
     }
     ModalBottomSheet(
         sheetState = sheetState,
-        containerColor = MaterialTheme.colors.surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         onDismissRequest = { dismiss() }
     ) {
         val scope = rememberCoroutineScope()
         TaskListDrawer(
-            bottomPadding = bottomPadding,
             begForMoney = begForMoney,
             filters = items,
             onClick = {
@@ -113,11 +110,6 @@ fun TasksMenu(
                         else
                             context.startActivity(Intent(context, PurchaseActivity::class.java))
 
-                    DrawerAction.CUSTOMIZE_DRAWER ->
-                        context.startActivity(
-                            Intent(context, NavigationDrawerCustomization::class.java)
-                        )
-
                     DrawerAction.SETTINGS ->
                         settingsRequest.launch(Intent(context, MainPreferences::class.java))
 
@@ -128,6 +120,8 @@ fun TasksMenu(
             onErrorClick = {
                 context.startActivity(Intent(context, MainPreferences::class.java))
             },
+            query = query,
+            onQueryChange = onQueryChange,
         )
     }
 }

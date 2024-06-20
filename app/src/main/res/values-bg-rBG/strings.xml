@@ -443,7 +443,6 @@
     <string name="astrid_sort_order_summary">Използвайте режима за ръчно сортиране на Astrid за „Моите задачи“, „Днес“ и етикетите. Този режим на сортиране ще бъде заменен с „Моя подредба“ в бъдещо издание</string>
     <string name="astrid_sort_order">Ръчно сортиране на Astrid</string>
     <string name="SSD_sort_my_order">Моя подредба</string>
-    <string name="manage_drawer">Управление на менюто</string>
     <string name="picker_mode_clock">Часовник</string>
     <string name="invite">Покана</string>
     <string name="picker_mode_calendar">Календар</string>
@@ -726,4 +725,14 @@
     <string name="change_priority">Промяна на приоритет</string>
     <string name="clear_completed_tasks_count">Задачата „%s“ ще бъде премахната</string>
     <string name="theme_dynamic">Динамична</string>
+    <string name="swipe_to_snooze_description">Отлагане на време</string>
+    <string name="swipe_to_snooze_time_immediately">веднага</string>
+    <string name="swipe_to_snooze_time_15_minutes">след 15 минути</string>
+    <string name="swipe_to_snooze_time_30_minutes">след 30 минути</string>
+    <string name="swipe_to_snooze_time_1_hour">след 1 час</string>
+    <string name="swipe_to_snooze_time_24_hours">след 24 часа</string>
+    <string name="swipe_to_snooze_title">Плъзнете за да отложите</string>
+    <string name="swipe_to_snooze_time_description">Изчистеното известие ще бъде отложено и пресъздадено %s</string>
+    <string name="show_edit_screen_without_unlock">Показване на екран за редактиране без отключване</string>
+    <string name="show_edit_screen_without_unlock_summary">Използва плочката за бързи настройки без отключване на устройството</string>
 </resources>

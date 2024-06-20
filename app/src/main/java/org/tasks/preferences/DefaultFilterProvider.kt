@@ -1,41 +1,43 @@
 package org.tasks.preferences
 
 import android.content.Context
-import com.todoroo.astrid.api.CaldavFilter
+import org.tasks.filters.CaldavFilter
 import com.todoroo.astrid.api.CustomFilter
-import com.todoroo.astrid.api.Filter
-import com.todoroo.astrid.api.GtasksFilter
-import com.todoroo.astrid.api.TagFilter
+import org.tasks.filters.GtasksFilter
+import org.tasks.filters.TagFilter
 import com.todoroo.astrid.core.BuiltInFilterExposer
 import com.todoroo.astrid.core.BuiltInFilterExposer.Companion.getMyTasksFilter
-import com.todoroo.astrid.data.Task
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.runBlocking
 import org.tasks.R
 import org.tasks.Strings.isNullOrEmpty
-import org.tasks.data.CaldavCalendar.Companion.ACCESS_READ_ONLY
-import org.tasks.data.CaldavDao
-import org.tasks.data.CaldavTask
-import org.tasks.data.FilterDao
 import org.tasks.data.GoogleTask
-import org.tasks.data.GoogleTaskDao
-import org.tasks.data.GoogleTaskListDao
-import org.tasks.data.LocationDao
-import org.tasks.data.TagDataDao
+import org.tasks.data.dao.CaldavDao
+import org.tasks.data.dao.FilterDao
+import org.tasks.data.dao.GoogleTaskDao
+import org.tasks.data.dao.GoogleTaskListDao
+import org.tasks.data.dao.LocationDao
+import org.tasks.data.dao.TagDataDao
+import org.tasks.data.entity.CaldavCalendar.Companion.ACCESS_READ_ONLY
+import org.tasks.data.entity.CaldavTask
+import org.tasks.data.entity.Task
+import org.tasks.data.getLocalList
+import org.tasks.filters.Filter
 import org.tasks.filters.PlaceFilter
 import timber.log.Timber
 import javax.inject.Inject
 
 class DefaultFilterProvider @Inject constructor(
         // TODO: don't inject context, it breaks built-in filters when overriding language
-        @param:ApplicationContext private val context: Context,
-        private val preferences: Preferences,
-        private val filterDao: FilterDao,
-        private val tagDataDao: TagDataDao,
-        private val googleTaskListDao: GoogleTaskListDao,
-        private val caldavDao: CaldavDao,
-        private val locationDao: LocationDao,
-        private val googleTaskDao: GoogleTaskDao) {
+    @param:ApplicationContext private val context: Context,
+    private val preferences: Preferences,
+    private val filterDao: FilterDao,
+    private val tagDataDao: TagDataDao,
+    private val googleTaskListDao: GoogleTaskListDao,
+    private val caldavDao: CaldavDao,
+    private val locationDao: LocationDao,
+    private val googleTaskDao: GoogleTaskDao
+) {
 
     var dashclockFilter: Filter
         @Deprecated("use coroutines") get() = runBlocking { getFilterFromPreference(R.string.p_dashclock_filter) }

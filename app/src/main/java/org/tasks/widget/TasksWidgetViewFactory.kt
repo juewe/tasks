@@ -6,28 +6,31 @@ import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService.RemoteViewsFactory
 import com.todoroo.andlib.utility.DateUtilities
-import com.todoroo.andlib.utility.DateUtilities.now
-import com.todoroo.astrid.api.AstridOrderingFilter
-import com.todoroo.astrid.api.Filter
 import com.todoroo.astrid.core.SortHelper
 import com.todoroo.astrid.subtasks.SubtasksHelper
 import kotlinx.coroutines.runBlocking
 import org.tasks.BuildConfig
 import org.tasks.R
 import org.tasks.data.TaskContainer
-import org.tasks.data.TaskDao
 import org.tasks.data.TaskListQuery.getQuery
+import org.tasks.data.dao.TaskDao
+import org.tasks.data.hasNotes
+import org.tasks.data.isHidden
+import org.tasks.data.isOverdue
 import org.tasks.date.DateTimeUtils
 import org.tasks.extensions.setBackgroundResource
 import org.tasks.extensions.setColorFilter
 import org.tasks.extensions.setMaxLines
 import org.tasks.extensions.setTextSize
 import org.tasks.extensions.strikethrough
+import org.tasks.filters.AstridOrderingFilter
+import org.tasks.filters.Filter
 import org.tasks.markdown.Markdown
 import org.tasks.tasklist.HeaderFormatter
 import org.tasks.tasklist.SectionedDataSource
 import org.tasks.themes.ColorProvider.Companion.priorityColor
-import org.tasks.time.DateTimeUtils.startOfDay
+import org.tasks.time.DateTimeUtils2.currentTimeMillis
+import org.tasks.time.startOfDay
 import org.tasks.ui.CheckBoxProvider.Companion.getCheckboxRes
 import timber.log.Timber
 import java.time.format.FormatStyle
@@ -92,7 +95,8 @@ internal class TasksWidgetViewFactory(
 
     override fun getViewTypeCount(): Int = 2
 
-    override fun getItemId(position: Int) = getTask(position).id
+    override fun getItemId(position: Int) =
+        if (tasks.isHeader(position)) tasks.getSection(position).value else getTask(position).id
 
     override fun hasStableIds(): Boolean = true
 
@@ -228,7 +232,7 @@ internal class TasksWidgetViewFactory(
                             )
                     )
                 }
-                if (taskContainer.isHidden && settings.showStartChips) {
+                if (taskContainer.task.isHidden && settings.showStartChips) {
                     val sortByDate = settings.groupMode == SortHelper.SORT_START && !disableGroups
                     chipProvider
                         .getStartDateChip(taskContainer, settings.showFullDate, sortByDate)
@@ -281,7 +285,7 @@ internal class TasksWidgetViewFactory(
             setViewVisibility(dueDateRes, View.VISIBLE)
             val text = if (
                 settings.groupMode == SortHelper.SORT_DUE &&
-                (task.sortGroup ?: 0L) >= now().startOfDay() &&
+                (task.sortGroup ?: 0L) >= currentTimeMillis().startOfDay() &&
                 !disableGroups
             ) {
                 task.takeIf { it.hasDueTime() }?.let {
@@ -295,7 +299,7 @@ internal class TasksWidgetViewFactory(
             setTextViewText(dueDateRes, text)
             setTextColor(
                 dueDateRes,
-                if (task.isOverdue) context.getColor(R.color.overdue) else onSurfaceVariant
+                if (task.task.isOverdue) context.getColor(R.color.overdue) else onSurfaceVariant
             )
             setTextSize(dueDateRes, max(10f, settings.textSize - 2))
             setOnClickFillInIntent(

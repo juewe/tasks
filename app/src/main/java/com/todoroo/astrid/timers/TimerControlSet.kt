@@ -12,18 +12,18 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.compose.ui.platform.ComposeView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.composethemeadapter.MdcTheme
 import com.todoroo.andlib.utility.DateUtilities
-import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.ui.TimeDurationControlSet
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.tasks.R
-import org.tasks.compose.collectAsStateLifecycleAware
 import org.tasks.compose.edit.TimerRow
+import org.tasks.data.entity.Task
 import org.tasks.date.DateTimeUtils
 import org.tasks.dialogs.DialogBuilder
+import org.tasks.themes.TasksTheme
 import org.tasks.themes.Theme
 import org.tasks.ui.TaskEditControlFragment
 import javax.inject.Inject
@@ -89,11 +89,11 @@ class TimerControlSet : TaskEditControlFragment() {
     override fun bind(parent: ViewGroup?): View =
         (parent as ComposeView).apply {
             setContent {
-                MdcTheme {
+                TasksTheme {
                     TimerRow(
-                        started = viewModel.timerStarted.collectAsStateLifecycleAware().value,
-                        estimated = viewModel.estimatedSeconds.collectAsStateLifecycleAware().value,
-                        elapsed = viewModel.elapsedSeconds.collectAsStateLifecycleAware().value,
+                        started = viewModel.timerStarted.collectAsStateWithLifecycle().value,
+                        estimated = viewModel.estimatedSeconds.collectAsStateWithLifecycle().value,
+                        elapsed = viewModel.elapsedSeconds.collectAsStateWithLifecycle().value,
                         timerClicked = this@TimerControlSet::timerClicked,
                         onClick = this@TimerControlSet::onRowClick,
                     )
@@ -112,7 +112,7 @@ class TimerControlSet : TaskEditControlFragment() {
         viewModel.addComment(String.format(
             "%s %s\n%s %s",  // $NON-NLS-1$
             getString(R.string.TEA_timer_comment_stopped),
-            DateUtilities.getTimeString(context, DateTimeUtils.newDateTime()),
+            DateUtilities.getTimeString(requireContext(), DateTimeUtils.newDateTime()),
             getString(R.string.TEA_timer_comment_spent),
             elapsedTime),
             null)
@@ -125,7 +125,7 @@ class TimerControlSet : TaskEditControlFragment() {
         viewModel.addComment(String.format(
             "%s %s",
             getString(R.string.TEA_timer_comment_started),
-            DateUtilities.getTimeString(context, DateTimeUtils.newDateTime())),
+            DateUtilities.getTimeString(requireContext(), DateTimeUtils.newDateTime())),
             null)
         return model
     }

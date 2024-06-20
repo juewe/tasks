@@ -7,15 +7,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.google.android.material.composethemeadapter.MdcTheme
 import org.tasks.R
 import org.tasks.compose.Chip
 import org.tasks.compose.ChipGroup
 import org.tasks.compose.DisabledText
 import org.tasks.compose.TaskEditRow
-import org.tasks.data.TagData
+import org.tasks.data.entity.TagData
 import org.tasks.themes.ColorProvider
 import org.tasks.themes.CustomIcons
+import org.tasks.themes.TasksTheme
 
 @Composable
 fun TagsRow(
@@ -38,7 +38,7 @@ fun TagsRow(
                                 R.drawable.ic_outline_label_24px
                             ),
                             name = tag.name,
-                            theme = tag.getColor()!!,
+                            theme = tag.color ?: 0,
                             showText = true,
                             showIcon = true,
                             onClick = onClick,
@@ -57,7 +57,7 @@ fun TagsRow(
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, widthDp = 320)
 @Composable
 fun NoTags() {
-    MdcTheme {
+    TasksTheme {
         TagsRow(
             tags = emptyList(),
             colorProvider = { 0 },
@@ -71,13 +71,14 @@ fun NoTags() {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, widthDp = 320)
 @Composable
 fun SingleTag() {
-    MdcTheme {
+    TasksTheme {
         TagsRow(
             tags = listOf(
-                TagData("Home").apply {
-                    setIcon(1062)
-                    setColor(ColorProvider.BLUE_500)
-                }
+                TagData(
+                    name = "Home",
+                    icon = 1062,
+                    color = ColorProvider.BLUE_500
+                )
             ),
             colorProvider = { it },
             onClick = {},
@@ -89,14 +90,14 @@ fun SingleTag() {
 @Preview(showBackground = true, widthDp = 320)
 @Composable
 fun BunchOfTags() {
-    MdcTheme {
+    TasksTheme {
         TagsRow(
             tags = listOf(
-                TagData("One"),
-                TagData("Two"),
-                TagData("Three"),
-                TagData("Four"),
-                TagData("Five"),
+                TagData(name = "One"),
+                TagData(name = "Two"),
+                TagData(name = "Three"),
+                TagData(name = "Four"),
+                TagData(name = "Five"),
             ),
             colorProvider = { it },
             onClick = {},
@@ -108,13 +109,14 @@ fun BunchOfTags() {
 @Preview(showBackground = true, widthDp = 320)
 @Composable
 fun TagWithReallyLongName() {
-    MdcTheme {
+    TasksTheme {
         TagsRow(
             tags = listOf(
-                TagData("This is a tag with a really really long name").apply {
-                    setIcon(1062)
-                    setColor(ColorProvider.BLUE_500)
-                }
+                TagData(
+                    name = "This is a tag with a really really long name",
+                    icon = 1062,
+                    color = ColorProvider.BLUE_500
+                )
             ),
             colorProvider = { it },
             onClick = {},

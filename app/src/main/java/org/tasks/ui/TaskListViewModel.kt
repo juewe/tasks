@@ -6,13 +6,9 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.todoroo.andlib.utility.DateUtilities
-import com.todoroo.astrid.api.AstridOrderingFilter
-import com.todoroo.astrid.api.Filter
-import com.todoroo.astrid.api.FilterImpl
-import com.todoroo.astrid.api.SearchFilter
+import org.tasks.filters.EmptyFilter
+import org.tasks.filters.SearchFilter
 import com.todoroo.astrid.core.BuiltInFilterExposer
-import com.todoroo.astrid.data.Task
 import com.todoroo.astrid.service.TaskDeleter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -31,15 +27,20 @@ import org.tasks.R
 import org.tasks.analytics.Firebase
 import org.tasks.billing.Inventory
 import org.tasks.compose.throttleLatest
-import org.tasks.data.DeletionDao
 import org.tasks.data.TaskContainer
-import org.tasks.data.TaskDao
 import org.tasks.data.TaskListQuery.getQuery
+import org.tasks.data.dao.DeletionDao
+import org.tasks.data.dao.TaskDao
+import org.tasks.data.entity.Task
+import org.tasks.data.fetchTasks
 import org.tasks.db.QueryUtils
-import org.tasks.filters.MyTasksFilter
+import org.tasks.filters.AstridOrderingFilter
+import org.tasks.filters.Filter
+import org.tasks.filters.FilterImpl
 import org.tasks.preferences.Preferences
 import org.tasks.preferences.QueryPreferences
 import org.tasks.tasklist.SectionedDataSource
+import org.tasks.time.DateTimeUtils2.currentTimeMillis
 import javax.inject.Inject
 
 @HiltViewModel
@@ -66,11 +67,12 @@ class TaskListViewModel @Inject constructor(
     }
 
     data class State(
-        val filter: Filter = MyTasksFilter(""),
-        val now: Long = DateUtilities.now(),
+        val filter: Filter = EmptyFilter(),
+        val now: Long = currentTimeMillis(),
         val searchQuery: String? = null,
         val tasks: TasksResults = TasksResults.Loading,
         val begForSubscription: Boolean = false,
+        val warnNotificationsDisabled: Boolean = false,
         val syncOngoing: Boolean = false,
         val collapsed: Set<Long> = setOf(SectionedDataSource.HEADER_COMPLETED),
     )
@@ -97,17 +99,26 @@ class TaskListViewModel @Inject constructor(
     fun invalidate() {
         _state.update {
             it.copy(
-                now = DateUtilities.now(),
+                now = currentTimeMillis(),
                 syncOngoing = preferences.isSyncOngoing,
             )
         }
     }
 
-    fun dismissBanner(clickedPurchase: Boolean) {
+    fun dismissNotificationBanner(
+        fix: Boolean = false,
+    ) {
+        _state.update {
+            it.copy(warnNotificationsDisabled = false)
+        }
+        preferences.warnNotificationsDisabled = fix
+    }
+
+    fun dismissPurchaseBanner(clickedPurchase: Boolean) {
         _state.update {
             it.copy(begForSubscription = false)
         }
-        preferences.lastSubscribeRequest = DateUtilities.now()
+        preferences.lastSubscribeRequest = currentTimeMillis()
         firebase.logEvent(R.string.event_banner_sub, R.string.param_click to clickedPurchase)
     }
 
@@ -155,7 +166,7 @@ class TaskListViewModel @Inject constructor(
                         tasks = TasksResults.Results(
                             SectionedDataSource(
                                 tasks = tasks,
-                                disableHeaders = !it.filter.supportsSorting()
+                                disableHeaders = it.filter.disableHeaders()
                                         || (it.filter.supportsManualSort() && preferences.isManualSort)
                                         || (it.filter is AstridOrderingFilter && preferences.isAstridSort),
                                 groupMode = preferences.groupMode,
@@ -169,14 +180,6 @@ class TaskListViewModel @Inject constructor(
             }
             .flowOn(Dispatchers.Default)
             .launchIn(viewModelScope)
-
-        viewModelScope.launch(Dispatchers.Default) {
-            if (!inventory.hasPro && !firebase.subscribeCooldown) {
-                _state.update {
-                    it.copy(begForSubscription = true)
-                }
-            }
-        }
     }
 
     override fun onCleared() {
@@ -198,6 +201,20 @@ class TaskListViewModel @Inject constructor(
                     it.collapsed.plus(group)
                 }
             )
+        }
+    }
+
+    fun updateBannerState() {
+        viewModelScope.launch(Dispatchers.Default) {
+            _state.update {
+                it.copy(warnNotificationsDisabled = preferences.warnNotificationsDisabled)
+            }
+
+            if (!inventory.hasPro && !firebase.subscribeCooldown) {
+                _state.update {
+                    it.copy(begForSubscription = true)
+                }
+            }
         }
     }
 
